@@ -1,0 +1,47 @@
+{{ $url := .Get 0 }}
+{{ $resource := resources.GetRemote $url }}
+{{ if $resource }}
+  {{ $content := $resource.Content }}
+
+  {{/* Remove YAML front matter - handle different line endings */}}
+  {{ $content = replaceRE "^---[\\s\\S]*?---[\\r\\n]*" "" $content }}
+
+  {{/* Remove first H1 heading to avoid duplicate titles - handle optional whitespace and line endings */}}
+  {{ $content = replaceRE "^#\\s+[^\\r\\n]*[\\r\\n]*" "" $content }}
+
+  {{/* Fix card shape syntax that breaks Mermaid - only within mermaid blocks */}}
+  {{ $content = replaceRE "(```mermaid[\\s\\S]*?)@\\{[^}]+\\}([\\s\\S]*?```)" "${1}${2}" $content }}
+
+  {{ $content | markdownify }}
+
+  {{/* Add Mermaid support only if content has diagrams */}}
+  {{ if findRE "```mermaid" $content }}
+    {{/* NOTE: Script path and hash are tied to current Hextra theme version */}}
+    <script defer src="/js/mermaid.min.d0830a6c05546e9edb8fe20a8f545f3e0dc7c4c3134d584bad9c13a99d7a71e0.js" integrity="sha256-0IMKbAVUbp7bj+IKj1RfPg3HxMMTTVhLrZwTqZ16ceA=" crossorigin="anonymous"></script>
+    <script>
+      if (!window.mermaidLoaded) {
+        window.mermaidLoaded = true;
+        document.addEventListener('DOMContentLoaded', () => {
+          document.querySelectorAll('.mermaid').forEach(e => { e.dataset.original = e.innerHTML; });
+          const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'default';
+          mermaid.initialize({ startOnLoad: true, theme: theme });
+          let timeout;
+          new MutationObserver(() => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+              const newTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'default';
+              document.querySelectorAll('.mermaid').forEach(e => {
+                e.innerHTML = e.dataset.original;
+                e.removeAttribute('data-processed');
+              });
+              mermaid.initialize({ startOnLoad: true, theme: newTheme });
+              mermaid.init();
+            }, 150);
+          }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        });
+      }
+    </script>
+  {{ end }}
+{{ else }}
+  {{ errorf "Unable to get remote resource %q" $url }}
+{{ end }}

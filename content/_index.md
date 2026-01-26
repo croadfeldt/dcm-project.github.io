@@ -63,6 +63,6 @@ The overarching goal is to define the configuration of an entire data center in 
 
 {{< cards >}}
   {{< card link="docs" title="Documentation" icon="book-open" subtitle="Guides, tutorials, and technical documentation" >}}
-  {{< card link="docs/adr" title="Architecture Decisions" icon="light-bulb" subtitle="ADRs documenting key architectural choices" >}}
+  {{< card link="docs/enhancements" title="Enhancements" icon="light-bulb" subtitle="Enhancement proposals documenting new features and changes" >}}
   {{< card link="blog" title="Blog & Updates" icon="newspaper" subtitle="Latest news, releases, and articles" >}}
 {{< /cards >}}

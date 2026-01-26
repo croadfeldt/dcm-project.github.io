@@ -7,7 +7,8 @@ sidebar:
 
 # DCM Documentation
 
-Welcome to the DCM project documentation.
+Documentation for the DCM project.
 
-Documentation content coming soon.
+## Documentation Sections
 
+- **[Enhancements](enhancements/)** - Enhancement proposals documenting new features, architectural decisions, and significant changes to the DCM project.

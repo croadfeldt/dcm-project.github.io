@@ -49,7 +49,7 @@ menu:
 
 params:
   description: Data Center Management - Documentation, ADRs, and resources
-  
+
   navbar:
     displayTitle: true
     displayLogo: false
@@ -57,7 +57,7 @@ params:
 
   page:
     width: full
-    
+
   theme:
     default: system
     displayToggle: true
