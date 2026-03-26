@@ -697,34 +697,67 @@ Rehydration uses **Intent State** — not Realized State — to reconstruct the 
 
 ---
 
-## SECTION 10 — RESOURCE GROUPING AND TENANCY
+## SECTION 10 — UNIVERSAL GROUP MODEL AND TENANCY
 
-### 10.1 DCM Tenant — Mandatory First-Class Ownership
+> The Universal Group Model (document 15-universal-groups.md) supersedes the separate Tenant and Resource Group models for new implementations. All existing constructs map 1:1 to `group_class` values. Existing UUIDs and API surfaces are preserved.
 
-Every Resource/Service Entity must belong to exactly one DCM Tenant. This is a **non-overridable DCM System Policy**.
+### 10.1 Universal Group Structure
+Every grouping construct in DCM is a `DCMGroup` with:
+- `group_class` — determines system behavior (see 10.2)
+- `group_subclass` — advisory label, no system behavior
+- `member_types_permitted` — what can be a member
+- `exclusivity` — one or many groups of this class per member
+- `enforcement_model` — advisory | enforced | mandatory (tenant_boundary: profile-governed)
+- `lifecycle_policy` — on_group_destroy: **detach (default)** | notify | cascade | retain
+- `former_group_membership` records retained permanently after detach
+- `group_destruction_record` retained in Audit Store permanently
+- Time-bounded membership: `valid_from / valid_until` on every membership
 
-Tenant provides: ownership, isolation, cost attribution, policy scope, drift detection scope, rehydration scope, audit scope, sovereignty boundary.
+### 10.2 Group Classes
 
-**Ownership vs Consumption:** A resource belongs to one Tenant (owner) but can be consumed by multiple Tenants via the Service Catalog. Consumption is tracked through service requests — not Tenant membership.
+| group_class | Purpose | enforcement |
+|-------------|---------|------------|
+| `tenant_boundary` | Ownership/isolation boundary (replaces Tenant) | profile-governed |
+| `resource_grouping` | Flexible entity tagging (replaces Resource Groups) | advisory |
+| `policy_collection` | Policy cohesion unit (replaces Policy Group) | advisory |
+| `policy_profile` | Deployment configuration (replaces Policy Profile) | enforced |
+| `layer_grouping` | Related layers for a context | advisory |
+| `composite` | Cross-type organizational unit | configurable |
+| `federation` | Peer-group association (federated Tenants) | advisory |
 
-### 10.2 Resource Groups — Flexible Composable Grouping
+### 10.3 DCM Tenant — tenant_boundary group_class
+Every resource entity must belong to exactly one `tenant_boundary` group (GRP-001). Provides: ownership, isolation, cost attribution, policy scope, drift detection scope, rehydration scope, audit scope, sovereignty boundary.
 
-Resource Groups function like **structured tags** — a resource accumulates group memberships describing its context from multiple dimensions simultaneously.
+**Structurally locked invariants** (cannot be overridden by any policy):
+- One tenant_boundary group per resource — always
+- Constituent relationships never cross tenant_boundary boundaries — at any nesting level
 
-**Two classes — equal capability:**
-- **DCM Default Resource Group** — built-in, standard grouping mechanism
-- **Custom Resource Group** — implementor-defined, tied to business structures (CostCenter, BusinessUnit, RegulatoryScope, etc.)
+**Profile-governed enforcement:** `minimal` profile → advisory; `standard`/`prod`/`fsi`/`sovereign` → mandatory. A GateKeeper policy fires when advisory tenancy detected in prod/fsi/sovereign deployment (GRP-011).
 
-Both implement the same **Resource Group Interface**.
+### 10.4 Nested Tenants
+A `tenant_boundary` group can have `parent_group_uuid` pointing to another `tenant_boundary` group. The parent-child relationship is a governance and cost relationship — NOT ownership transfer.
 
-### 10.3 Multi-Group Membership
-A resource can belong to multiple groups across all classes. Membership constraints are configurable per group definition:
-- `exclusive: true` — resource can only belong to one group of this type at a time
-- `exclusive: false` — resource can belong to multiple groups of this type
-- Organizational policies can further restrict multi-group membership
+**Parent can:** aggregate cost, apply governance overlay, query aggregate audit, declare child lifecycle policies  
+**Parent cannot:** own child resources, cross child isolation boundaries, override more-restrictive child policies
 
-### 10.4 Nesting
-Groups that declare `nesting: true` can contain other groups as members. Nesting is configurable per group definition. Circular nesting is invalid. Child groups inherit policy scope from parent groups.
+**Governance inheritance — most restrictive wins (GRP-009):**
+```
+Most restrictive policy at ANY nesting level wins
+  Child policies that are more restrictive than parent → child wins
+  Parent policies cascade where child has no policy or is less restrictive
+  Platform policies govern all tenant_boundary groups
+```
+
+### 10.5 Federated Tenants
+A `federation` group contains peer `tenant_boundary` groups. Enables shared policy application, cross-federation visibility, and consolidated reporting. Does NOT grant governance authority — member Tenants remain independent (GRP-010).
+
+### 10.6 Composite Groups
+A `composite` group permits all member types — resource entities, policies, layers, and other groups. Enables "everything about Payments" as one organizational unit.
+
+Policy targeting composite groups defaults to all member types. Declare `member_type_filter` to narrow. Policy linting warns if composite is targeted without filter (GRP-012).
+
+### 10.7 GRP System Policies
+GRP-001 through GRP-014. Key: GRP-001 (one tenant_boundary per resource), GRP-003 (no circular nesting), GRP-005 (detach is default on destroy), GRP-006 (resource in leaf Tenant always), GRP-009 (most restrictive wins in nesting), GRP-011 (advisory tenancy in prod triggers notification), GRP-013 (former_group_membership permanent), GRP-014 (destruction record permanent).
 
 ### 10.5 DCM System Policies for Grouping
 
@@ -1422,16 +1455,16 @@ A **Policy Profile** is a complete DCM configuration for a specific use case com
 
 **Six DCM built-in profiles (least to most restrictive):**
 
-| Profile | Tenancy | Enforcement | Cross-Tenant | Audit |
-|---------|---------|-------------|-------------|-------|
-| `minimal` | Optional — auto-created | Advisory only | allow_all | None |
-| `dev` | Recommended | Warn only | operational_only | Basic 90-day |
-| `standard` | Required | Blocking | explicit_only | Compliance-grade |
-| `prod` | Required | Blocking + SLA | explicit_only | Compliance-grade |
-| `fsi` | Hard tenancy | Blocking | explicit_only | 7-year retention |
-| `sovereign` | Hard tenancy | Blocking | deny_all | 10-year retention |
+| Profile | Handle | Tenancy | Enforcement | Cross-Tenant | Audit |
+|---------|--------|---------|-------------|-------------|-------|
+| `minimal` | `system/profile/minimal` | Optional — auto-created | Advisory only | allow_all | None |
+| `dev` | `system/profile/dev` | Recommended | Warn only | operational_only | Basic 90-day |
+| `standard` | `system/profile/standard` | Required | Blocking | explicit_only | Compliance-grade |
+| `prod` | `system/profile/prod` | Required | Blocking + SLA | explicit_only | Compliance-grade |
+| `fsi` | `system/profile/fsi` | Hard tenancy | Blocking | explicit_only | 7-year retention |
+| `sovereign` | `system/profile/sovereign` | Hard tenancy | Blocking | deny_all | 10-year retention |
 
-**Profile inheritance chain:** sovereign extends fsi extends prod extends standard extends dev extends minimal
+**Profile inheritance chain:** `system/profile/sovereign` extends `system/profile/fsi` extends `system/profile/prod` extends `system/profile/standard` extends `system/profile/dev` extends `system/profile/minimal`
 
 **Profile activation levels (more specific wins):**
 ```yaml
@@ -1447,12 +1480,12 @@ A **Policy Provider** is a fifth DCM provider type — an external authoritative
 
 **Four delivery modes:**
 
-| Mode | Name | Logic Lives In |
-|------|------|---------------|
-| 1 | DCM Native Push/Pull | DCM Policy Engine |
-| 2 | OPA/Rego Bundle | DCM Policy Engine (OPA) |
-| 3 | External Schema (naturalization) | DCM Policy Engine (post-translation) |
-| 4 | Black Box Query-Enrichment | External provider — opaque to DCM |
+| Mode | Name | `delivery.mode` value | Logic Lives In |
+|------|------|----------------------|---------------|
+| 1 | DCM Native Push/Pull | `push` / `pull` / `webhook` | DCM Policy Engine |
+| 2 | OPA/Rego Bundle | `opa_bundle` | DCM Policy Engine (OPA) |
+| 3 | External Schema (naturalization) | `external_schema` | DCM Policy Engine (post-translation) |
+| 4 | Black Box Query-Enrichment | `black_box_query` | External provider — opaque to DCM |
 
 **Modes 1-3** deliver policy rules. **Mode 4** is a query-response interface — DCM sends data, external system evaluates and/or enriches, returns structured result.
 
@@ -1528,7 +1561,169 @@ When rehydration conflicts with current tenancy controls → entity enters **PEN
 
 ---
 
-## SECTION 22 — PERSONAS
+## SECTION 22 — UNIVERSAL GROUP MODEL
+
+DCM collapses all grouping constructs into a single **DCMGroup** entity with `group_class` metadata. One mental model, one API, one registry. See `15-universal-groups.md` for the complete model.
+
+### 22.1 Group Classes
+
+| group_class | Replaces | member_types_permitted | exclusivity |
+|-------------|---------|----------------------|------------|
+| `tenant_boundary` | Tenant | resource_entity, group | one (structural lock) |
+| `resource_grouping` | Resource Group | resource_entity | many |
+| `policy_collection` | Policy Group | policy | many |
+| `policy_profile` | Policy Profile | group | many |
+| `layer_grouping` | Layer grouping | layer | many |
+| `provider_grouping` | Provider collections | provider | many |
+| `composite` | (new) | all types | many |
+| `federation` | (new) | group (tenant_boundary) | many |
+
+### 22.2 Structural Invariants (non-overridable)
+- `GRP-INV-001` — resource_entity belongs to exactly one tenant_boundary group
+- `GRP-INV-002` — constituent relationships cannot cross tenant_boundary boundaries
+- `GRP-INV-003` — destroying parent tenant_boundary requires explicit resolution of all children first
+- `GRP-INV-004` — resource in child tenant_boundary belongs to child — never parent
+- `GRP-INV-005` — circular group membership invalid
+- `GRP-INV-006` — group cannot be a member of itself
+
+### 22.3 Composite Groups
+`member_types_permitted: [resource_entity, policy, layer, group, provider]`. Policies targeting composite groups apply to all member types by default. Narrow with `member_type_filter`.
+
+### 22.4 Nested Tenants
+`tenant_boundary` group with `parent_group_uuid`. Parent has governance overlay and cost rollup — not ownership. Policy inheritance direction is profile-governed (opt_in for minimal/dev/fsi/sovereign; opt_out for standard/prod).
+
+### 22.5 Federated Tenants
+`federation` group containing `tenant_boundary` groups as peers. Members remain fully independent. Enables shared governance, consolidated reporting, scoped cross-member visibility.
+
+### 22.6 API Backward Compatibility
+`GET /tenants` → `GET /groups?group_class=tenant_boundary`. All existing UUIDs and API endpoints preserved.
+
+---
+
+## SECTION 23 — UNIVERSAL AUDIT MODEL
+
+Every modification to every DCM artifact produces an audit record. No exceptions. See `16-universal-audit.md` for the complete model.
+
+### 23.1 Four Required Fields
+**Date/time** (ISO 8601 microseconds) | **Who** (composite actor chain) | **What** (subject entity) | **Action** (closed vocabulary)
+
+### 23.2 Two-Stage Audit — Synchronous Commit + Async Enrichment
+
+**Stage 1 (synchronous, < 1ms, in critical path):**
+```yaml
+commit_log_entry:
+  entry_uuid: <uuid>
+  sequence: <integer>           # monotonically increasing
+  timestamp: <ISO 8601 microseconds>   # AUTHORITATIVE audit timestamp
+  entity_uuid / entity_type / action / actor_uuid / tenant_uuid
+  change_fingerprint: <SHA-256>
+  status: pending_forward
+```
+Written using Raft consensus — confirmed when quorum (2/3 or 3/5) of Commit Log replicas acknowledge. Operation returns success after Stage 1. Stage 1 timestamp is the authoritative audit timestamp (AUD-013).
+
+**Stage 2 (asynchronous, out of critical path):**
+Audit Forward Service enriches minimal Commit Log entry → full audit_record → hash chain computed → written to Audit Store with retry. Full record visible seconds to minutes after Stage 1.
+
+### 23.3 Composite Actor Chain — The "Who"
+```yaml
+actor:
+  immediate:
+    type: <human|system_component|policy|provider|scheduled_job|mode4_provider>
+    uuid / display_name
+  authorized_by:
+    uuid / authorization_method: <direct_action|request_submission|policy_activation|system_policy|scheduled>
+  request_uuid / policy_uuid / correlation_id
+```
+
+### 23.4 Action Vocabulary (closed — AUD-007)
+`CREATE | MODIFY | STATE_TRANSITION | DELETE | ACTIVATE | DEACTIVATE | DEPRECATE | RETIRE | MEMBER_ADD | MEMBER_REMOVE | RELATIONSHIP_CREATE | RELATIONSHIP_RELEASE | AUTHORIZE | REVOKE | EVALUATE | ENRICH | LOCK | HOLD_PLACE | HOLD_CONFIRM | HOLD_RELEASE | DRIFT_DETECT | DRIFT_RESOLVE | INGEST | PROMOTE | EXPIRE | REHYDRATE | QUERY | DISCOVER | LOGIN | LOGOUT | CONFIG_CHANGE`
+
+### 23.5 Retention — Reference-Based
+- `retention_status: live` — any referenced entity non-retired → retain unconditionally
+- `retention_status: all_retired` → apply governing policy
+- Post-lifecycle defaults: dev=P90D, standard=P3Y, prod/fsi=P7Y (DEFAULT), sovereign=P10Y
+
+### 23.6 Tamper-Evidence — Hash Chain
+`record_hash` (SHA-256 of record) + `previous_record_hash` (preceding record for this entity) + `chain_sequence`. Chain breaks detectable and trigger security alerts (AUD-010).
+
+### 23.7 Recoverability
+- DCM crash after Stage 1 → Audit Forward Service replays `pending_forward` entries on restart (AUD-011)
+- Audit Store unavailable → Commit Log accumulates; Audit Forward Service retries when recovered
+- Commit Log quorum unavailable → operation aborted — no silent change
+
+### 23.8 System Policies
+- `AUD-001` — Every modification produces Commit Log entry synchronously; Commit Log write failure aborts operation
+- `AUD-002` — Audit records append-only and immutable while retention obligations apply
+- `AUD-003` — Audit records survive at least as long as any referenced entity is live
+- `AUD-004` — Post-lifecycle retention governed by policy; default P7Y
+- `AUD-005` — Actor field must identify immediate actor + authorized_by chain
+- `AUD-006` — record_hash + previous_record_hash hash chain required
+- `AUD-007` — Action field must use closed vocabulary
+- `AUD-008` — Audit Store must support queries by entity_uuid, actor_uuid, action, timestamp range, tenant_uuid, request_uuid, retention_status
+- `AUD-009` — Audit Forward Service delivers with exponential backoff retry; cleared only after Audit Store confirmation AND retention window
+- `AUD-010` — Hash chain verification first-class; chain breaks trigger immediate security alerts
+- `AUD-011` — On restart, Audit Forward Service replays all pending_forward entries before accepting new operations
+- `AUD-012` — Commit Log uses Raft consensus with quorum writes
+- `AUD-013` — Stage 1 Commit Log timestamp is authoritative audit timestamp
+
+---
+
+## SECTION 24 — DEPLOYMENT AND REDUNDANCY
+
+Every DCM component and store is designed for redundancy by default. Everything containerized. Profile-governed. Self-hosting. See `17-deployment-redundancy.md` for the complete model.
+
+### 24.1 Core Principles
+- **Redundant by default** — every component and store has a redundancy model
+- **Everything containerized** — all components run as Kubernetes pods; no bare-metal DCM
+- **Profile-governed** — replica counts and quorum set by active Profile; not per-component
+- **Stateless control plane** — all state in external stores; any pod can fail and be replaced
+- **Self-hosting** — DCM's own deployment is a DCM resource; DCM manages itself
+
+### 24.2 Redundancy Matrix by Profile
+
+| Profile | CP Replicas | Store Replicas | Write Quorum | Zone Spread | Geo-Replication |
+|---------|------------|---------------|-------------|------------|----------------|
+| `minimal` | 1 | 1 | No | No | No |
+| `dev` | 1 | 1 | No | No | No |
+| `standard` | 3 | 3 | 2/3 | Preferred | No |
+| `prod` | 3 | 3 | 2/3 | Required | Yes |
+| `fsi` | 5 | 5 | 3/5 | Required | Yes |
+| `sovereign` | 5 | 5 | 3/5 | Required | Within boundary |
+
+### 24.3 Store Redundancy Model
+
+| Store | Implementation | Write Quorum | Notes |
+|-------|---------------|-------------|-------|
+| Commit Log | etcd (Raft) | 2/3 | Stage 1 audit; < 1ms write |
+| GitOps Store | Gitea/equivalent | 2/3 | Intent, Requested, Layers, Policies |
+| Event Stream | Kafka/equivalent | 2/3 | Realized, Discovered, Audit events |
+| Audit Store | Elasticsearch/equivalent | 2/3 | Indexed, queryable, compliance-grade |
+| Search Index | Elasticsearch/equivalent | 1 | Non-authoritative — rebuildable from Git |
+
+### 24.4 Pod Security Model (all components)
+`run_as_non_root: true` | `run_as_user: 65534` | `read_only_root_filesystem: true` | `allow_privilege_escalation: false` | `capabilities.drop: [ALL]` | mTLS for all inter-component communication (RED-009)
+
+### 24.5 Self-Hosting
+DCM's own deployment is declared as a `dcm_deployment` DCM resource in Git. DCM runs drift detection on its own components. Bootstrap sequence: bootstrap installer → reads `dcm_deployment` from Git → provisions to target redundant state → hands off.
+
+### 24.6 The Repave Scenario
+DCM lost entirely → bootstrap installer on new cluster → reads `dcm_deployment` from Git → provisions itself → rehydrates customer workloads in dependency order → drift detection validates. Recovery bounded by infrastructure provisioning speed — not backup restoration.
+
+### 24.7 System Policies
+- `RED-001` — All DCM components run as containers in Kubernetes pods
+- `RED-002` — All control plane components stateless
+- `RED-003` — Profiles above `minimal`: replicas >= 3 with anti-affinity
+- `RED-004` — Profiles above `minimal`: quorum writes with write_quorum >= 2
+- `RED-005` — Commit Log uses Raft consensus with quorum writes
+- `RED-006` — DCM deployment declared as DCM resource in Git
+- `RED-007` — DCM runs drift detection on its own components
+- `RED-008` — Rolling updates must not reduce replicas below min_available
+- `RED-009` — All component communication uses mTLS
+- `RED-010` — Bootstrap manifest is the only DCM config outside DCM's management scope
+
+---
+
+## SECTION 25 — PERSONAS
 
 | Persona | Primary Concern |
 |---------|----------------|
@@ -1545,7 +1740,7 @@ When rehydration conflicts with current tenancy controls → entity enters **PEN
 
 ---
 
-## SECTION 23 — TERMINOLOGY GLOSSARY
+## SECTION 26 — TERMINOLOGY GLOSSARY
 
 | Term | Definition |
 |------|-----------|
@@ -1598,6 +1793,33 @@ When rehydration conflicts with current tenancy controls → entity enters **PEN
 | **Tenant Advocate** | DCM's role in protecting Tenant interests in all provider interactions |
 | **DCM System Policy** | Non-overridable policy built into DCM — cannot be disabled or overridden by organizational policy |
 | **Webhook** | Push-based outbound notification from DCM to an external system triggered by a DCM event |
+| **Commit Log** | Stage 1 audit store — minimal record, Raft consensus quorum write, sub-millisecond; Audit Forward Service reads from it to produce full audit records |
+| **Audit Forward Service** | DCM component that enriches Commit Log entries into full audit_record structures and delivers them to the Audit Store asynchronously with retry |
+| **Self-Hosting** | DCM's own deployment is a DCM resource; DCM manages itself through the same model used for customer infrastructure |
+| **dcm_deployment** | The DCM resource declaring DCM's own deployment — profile, replica counts, store implementations, redundancy configuration |
+| **Bootstrap manifest** | The minimal configuration outside DCM's management scope used to bootstrap DCM before it can manage itself |
+| **Redundancy by Default** | DCM architectural principle: every component and store has a redundancy model; `minimal` profile sets replicas: 1; all others set replicas >= 3 |
+| **Quorum Write** | Write confirmed durable only when a majority of replicas acknowledge it; used by Commit Log and all durable stores in standard+ profiles |
+| **Raft** | Consensus protocol used by Commit Log (etcd) for quorum writes; guarantees durability even if minority of replicas fail |
+| **DCMGroup** | Universal group entity — all grouping constructs in DCM expressed as DCMGroup with group_class |
+| **group_class** | Determines system behavior of a DCMGroup — closed built-in set: tenant_boundary, resource_grouping, policy_collection, policy_profile, layer_grouping, composite, federation |
+| **group_subclass** | Advisory label on a DCMGroup — no system behavior; used for organization-specific semantics (e.g., cost_center, business_unit) |
+| **composite group** | DCMGroup with group_class: composite — permits cross-type membership (resources, policies, layers, groups) |
+| **federation group** | DCMGroup with group_class: federation — peer association of tenant_boundary groups; enables shared policies and consolidated reporting |
+| **nested Tenant** | A tenant_boundary group with parent_group_uuid pointing to another tenant_boundary group |
+| **federated Tenant** | A tenant_boundary group that is a member of a federation group |
+| **former_group_membership** | Permanent provenance record retained by a member after group destruction or membership expiry |
+| **group_destruction_record** | Permanent Audit Store record of a destroyed group including its full member list at destruction time |
+| **member_type_filter** | Policy targeting declaration narrowing scope within a composite group to specific member types |
+| **most_restrictive_wins** | Governance inheritance principle for nested Tenants — most restrictive policy at any level in the hierarchy applies |
+| **Nested Tenant** | tenant_boundary group with parent_group_uuid — child maintains isolation; parent has governance overlay and cost rollup |
+| **GRP-INV** | Universal group structural invariants — non-overridable regardless of enforcement_model or Profile |
+| **Universal Audit Record** | Uniform audit record produced by every DCM component for every change — date/time, who, what, action |
+| **Composite Actor Chain** | The who in an audit record — immediate actor + authorized_by human chain + originating request/policy |
+| **Action Vocabulary** | Closed set of audit record action values — free text rejected at write time (AUD-007) |
+| **Reference-Based Retention** | Audit records retained while any referenced entity is live — not fixed time schedule |
+| **Write-Ahead Log (WAL)** | Local audit delivery buffer — change + audit record written atomically; Audit Store delivery async with retry; WAL cleared after Audit Store confirms |
+| **Hash Chain** | Per-entity tamper-evident chain: record_hash + previous_record_hash; chain breaks detectable and trigger security alerts |
 | **Mode 4 Policy Provider** | Black box query-enrichment policy provider — DCM sends query, external system evaluates and/or enriches, returns structured result; logic is opaque to DCM |
 | **Black Box Query-Enrichment** | Mode 4 operation where an external system simultaneously evaluates request data and injects enrichment fields into the payload |
 | **audit_token** | Provider-issued reference in Mode 4 responses enabling cross-system audit correlation between DCM audit trail and provider's internal logs |
@@ -1606,7 +1828,6 @@ When rehydration conflicts with current tenancy controls → entity enters **PEN
 | **Policy Group** | Cohesive versioned collection of policies addressing a single identifiable concern — the unit of policy reuse |
 | **Policy Profile** | Complete DCM configuration for a specific use case — composed of Policy Groups |
 | **Policy Provider** | Fifth DCM provider type — external authoritative source supplying policies into DCM |
-| **Policy Naturalization** | Translation of external policy schemas (OSCAL, XCCDF, CIS JSON) into DCM policy format |
 | **concern_type** | Policy Group classification: technology, compliance, sovereignty, business, operational, security |
 | **minimal profile** | Least restrictive built-in profile — advisory enforcement, auto-tenant, home lab / evaluation |
 | **sovereign profile** | Most restrictive built-in profile — hard tenancy, deny_all cross-tenant, maximum sovereignty |
@@ -1626,7 +1847,6 @@ When rehydration conflicts with current tenancy controls → entity enters **PEN
 | **`__transitional__` Tenant** | System-managed holding Tenant for unassigned ingested entities — cannot be deleted, renamed, or used for new provisioning |
 | **Ingestion Confidence** | `high | medium | low` — quality signal for auto-assignment; reflects how reliable the Tenant assignment is |
 | **Brownfield** | Existing infrastructure not yet under DCM lifecycle management — brought in via brownfield ingestion |
-| **Greening the Brownfield** | The progressive process of bringing unmanaged infrastructure under DCM lifecycle control via the ingestion model |
 | **V1 Migration** | Migration of pre-Tenant DCM V1 entities to V2 using the ingestion model |
 | **INGESTED state** | First ingestion lifecycle state — entity in DCM, minimal metadata, Tenant may be __transitional__ |
 | **ENRICHING state** | Second ingestion lifecycle state — Tenant assigned, metadata and relationships being completed |
@@ -1682,7 +1902,6 @@ When rehydration conflicts with current tenancy controls → entity enters **PEN
 | **Audit Component** | Separate DCM component aggregating provenance events from all stores — compliance-grade, long-retention |
 | **Observability Store** | Time-series metrics, traces, and logs — operational, not compliance-grade |
 | **Third Rail** | Direct API ingress path — bypasses PR workflow, never bypasses governance |
-| **Unsanctioned Change** | A resource modification not traceable to a DCM request — triggers UNSANCTIONED_CHANGE event |
 | **Layer Domain** | Organizational and architectural home of a layer — system, platform, tenant, service, provider |
 | **Layer Handle** | Human-readable stable identifier for a layer — format: domain/layer_type/name |
 | **Priority Schema** | Hierarchical dotted-notation priority system for deterministic layer conflict resolution |
@@ -1700,7 +1919,7 @@ When rehydration conflicts with current tenancy controls → entity enters **PEN
 
 ---
 
-## SECTION 24 — OPEN QUESTIONS
+## SECTION 27 — OPEN QUESTIONS
 
 These items are explicitly unresolved. Do not make assumptions about them — flag them and ask for guidance.
 
@@ -1797,7 +2016,7 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
-## SECTION 25 — DOCUMENTATION STRUCTURE
+## SECTION 28 — DOCUMENTATION STRUCTURE
 
 DCM documentation follows a hierarchical structure:
 
@@ -1845,7 +2064,7 @@ content/
 
 ---
 
-## SECTION 26 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 29 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, follow these instructions:
 
@@ -1889,6 +2108,21 @@ When working on this project, follow these instructions:
 38. **Conflicts are resolved at ingestion, not assembly** — all active layers in DCM are pre-validated conflict-free; the assembly process never encounters an ambiguous merge; if a conflict is found at ingestion, the PR is blocked until resolved
 39. **Priority schema is advisory for categories, mandatory for ordering** — the reference taxonomy (900=Compliance, 800=Security, etc.) is advisory and organizations may adapt it; however, the numeric comparison rule is always enforced and always deterministic
 40. **Proposed status enables shadow validation** — policy artifacts in proposed status execute in shadow mode against real traffic; output is captured in proposed_evaluation_record but never applied; this is the required validation step before activation
+65. **Universal Group Model supersedes separate grouping constructs** — all Tenants, Resource Groups, Policy Groups, and Profiles are DCMGroup entities with group_class; use the universal model for new implementations; existing UUIDs and APIs are preserved
+66. **group_class drives system behavior, group_subclass is advisory** — never design system behavior around group_subclass; only the built-in group_class values produce system-enforced behavior
+67. **Composite groups default to targeting all member types** — always declare member_type_filter when writing policies that target a composite group unless genuinely intending to govern all member types simultaneously
+68. **Nested tenant governance: most restrictive wins** — a child policy that is more restrictive than a parent policy wins; parent policies cascade where the child has no policy; this is the same principle as save_overrides_destroy and field override control
+69. **former_group_membership records are permanent** — group destruction does not erase membership history; queries against membership history are valid at any time via provenance store; use this for compliance and audit queries about past associations
+71. **Two-stage audit: Stage 1 is the durability guarantee** — the Commit Log quorum write confirms the change is audited; Stage 2 enrichment is asynchronous; Stage 1 timestamp is the authoritative audit timestamp (AUD-013)
+72. **Redundancy is profile-governed — not per-component** — never configure replica counts individually; activate the appropriate Profile and it configures redundancy for the entire deployment
+73. **DCM is self-hosting** — DCM's own deployment is a DCM resource; DCM manages itself through the same four-state model, policy engine, and audit trail used for customer workloads
+74. **Everything is containerized** — no bare-metal DCM components; all components run as Kubernetes pods following the standard pod security model; state is always in external stores (stateless control plane)
+65. **All DCM grouping uses DCMGroup with group_class** — there is no separate Tenant entity, Resource Group entity, or Policy Group entity; they are all group_class values; use the class-filtered API views for backward compatibility
+66. **Composite groups apply to all member types by default** — always use member_type_filter when targeting a composite group with a policy that should apply only to specific member types
+67. **Nested Tenants inherit governance from parent — not ownership** — a resource always belongs to its leaf tenant_boundary group; the parent has governance overlay and cost rollup only; GRP-INV-004 is non-overridable
+68. **Every change produces an audit record — no exceptions** — the WAL guarantees delivery; WAL write failure aborts the change; no silent unaudited changes are possible
+69. **Audit retention is reference-based — not time-based** — a 7-year retention policy means 7 years AFTER all referenced entities retire; a record created 20 years ago is retained unconditionally if any referenced entity is still operational
+70. **The audit hash chain is tamper-evident** — any insertion, modification, or deletion of a historical record breaks the chain; verification is a first-class DCM operation; chain breaks trigger security alerts
 63. **Mode 4 Policy Providers are query-response interfaces** — logic lives externally; DCM sends minimized data, receives decision and/or enrichment; data sovereignty check always runs before any query is dispatched; default failure behavior is gatekeep
 64. **Mode 4 enrichment fields carry full provenance** — source_type: black_box_provider, source_uuid, and audit_token; override control applies; a GateKeeper can refuse enrichment on sensitive fields; enrichment providers require transformation trust level minimum
 57. **Policy Profiles are the primary configuration mechanism** — most deployments activate a built-in profile and add organization-specific groups; do not configure individual policies from scratch when a profile covers the use case

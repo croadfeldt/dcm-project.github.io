@@ -11,8 +11,10 @@ weight: 7
 > Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 
+> **Universal Group Model:** The constructs defined in this document (DCM Tenant, Resource Groups) are superseded by the [Universal Group Model](15-universal-groups.md) for new implementations. Existing constructs map 1:1 to `group_class` values in the universal model — UUIDs, handles, and API references are preserved. This document remains valid as a reference for pre-universal implementations and for understanding the migration path.
+
 **Document Status:** 🔄 In Progress  
-**Related Documents:** [Context and Purpose](../context-and-purpose/) | [Resource/Service Entities](../resource-service-entities/) | [Service Dependencies](../service-dependencies/)
+**Related Documents:** [Context and Purpose](00-context-and-purpose.md) | [Resource/Service Entities](06-resource-service-entities.md) | [Service Dependencies](07-service-dependencies.md)
 
 ---
 

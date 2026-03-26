@@ -255,7 +255,7 @@ The **Priority Schema** is the deterministic ordering mechanism for resolving co
 
 **Format:** `{integer}.{integer}.{integer}...` — unlimited depth
 
-**Comparison:** Left-to-right, segment by segment. **Higher numeric value = higher priority.** No ceiling — you can always go higher.
+**Comparison:** Left-to-right, segment by segment. **Higher numeric value = higher priority** (higher value = higher priority). No ceiling — you can always go higher.
 
 ```
 900.10    beats    800.10    (900 > 800 at segment 1)
@@ -1036,7 +1036,7 @@ field_name:
 
 ---
 
-The Request Payload Processor assembles the final payload by executing the following steps in order. Each step is recorded in the payload's provenance chain.
+The Request Payload Processor assembles the final payload by executing the following **nine steps** in order. Each step is recorded in the payload's provenance chain.
 
 ### Step 1 — Intent Capture
 The consumer's Request Layer is received and stored as the **Intent State** in the Intent Store. No modification occurs at this step. The Intent State is the immutable record of what the consumer asked for.

@@ -27,4 +27,8 @@ realization, operation, and decommission.
   {{< card link="audit-provenance-observability" title="Audit, Provenance, and Observability" icon="eye" subtitle="The three distinct concerns of audit, data lineage, and operational observability." >}}
   {{< card link="ingestion-model" title="Ingestion Model" icon="inbox-in" subtitle="Unified V1 migration and brownfield ingestion: ingest, enrich, promote. Transitional Tenant and ING system policies." >}}
   {{< card link="policy-profiles" title="Policy Organization" icon="collection" subtitle="Policy Groups, Profiles, and Providers. Built-in profiles from minimal to sovereign. Lifecycle constraints. Cross-tenancy authorization." >}}
+  {{< card link="universal-groups" title="Universal Group Model" icon="user-group" subtitle="One DCMGroup with group_class. Composite groups, nested Tenants, federated Tenants. All grouping constructs unified." >}}
+  {{< card link="universal-audit" title="Universal Audit Model" icon="shield-check" subtitle="Two-stage audit: synchronous Commit Log + async Audit Store. Reference-based retention. Tamper-evident hash chains. AUD-001 through AUD-013." >}}
+  {{< card link="deployment-redundancy" title="Deployment and Redundancy" icon="server" subtitle="Redundant by default. Everything containerized. Profile-governed replicas. Self-hosting. Quorum writes. RED-001 through RED-010." >}}
+  {{< card link="universal-groups" title="Universal Group Model" icon="view-grid" subtitle="Unified grouping: Tenants, Resource Groups, Policy Groups as one model. Composite groups, nested and federated Tenants, permanent membership history." >}}
 {{< /cards >}}

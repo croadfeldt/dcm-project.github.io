@@ -246,6 +246,11 @@ tenant:
 | `REL-010` | Constituent relationships may not cross Tenant boundaries |
 | `REL-011` | Cross-tenant operational relationships require explicit authorization from both the owning Tenant and the consuming Tenant |
 | `REL-012` | A Tenant with `hard_tenancy.cross_tenant_relationships: deny_all` may not participate in any cross-tenant relationship in any direction |
+| `XTA-001` | Cross-tenant information sharing is closed by default — explicit authorization required for all cross-tenant relationships of any nature (see Policy Organization document Section 6) |
+| `XTA-002` | Cross-tenant authorizations must specify who, what, when, and where |
+| `XTA-003` | More specific authorizations take precedence: field_specific > resource_specific > tenant_global |
+| `XTA-004` | All cross-tenant authorization decisions are policy-driven and DCM-enforced |
+| `XTA-005` | Sovereignty constraints declared by either Tenant must be honored by all cross-tenant relationships |
 
 ---
 
@@ -890,6 +895,14 @@ lifecycle_policy:
         timestamp: <ISO 8601>
       modifications: []
 ```
+
+### 11.2a Cross-Tenant Dependency System Policies
+
+| Policy | Rule |
+|--------|------|
+| `DEP-001` | Cross-tenant constituent dependencies are prohibited — a dependency that would produce a constituent cross-tenant relationship is rejected at dependency graph construction time |
+| `DEP-002` | Cross-tenant operational dependencies require a valid available allocation record on the target resource — failure returns `CROSS_TENANT_DEPENDENCY_UNAVAILABLE` |
+| `DEP-003` | A Resource Type Specification may only declare cross-tenant dependencies if explicitly marked `cross_tenant: permitted` — default is `cross_tenant: not_permitted` |
 
 ### 11.3 Relationship Versioning and Deprecation
 
