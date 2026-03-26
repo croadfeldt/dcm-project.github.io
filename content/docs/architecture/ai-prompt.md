@@ -1218,9 +1218,12 @@ Providers must honor a multi-dimensional contract:
 ### 16.4 Provider Types
 - **Atomic Providers** — manage a single fundamental resource type (VM, IP, VLAN, container)
 - **Meta Providers** — compose multiple providers as components of their own service
-- **Process Providers** — purely process-based (no infrastructure resource, but a workflow or automation)
-- **Policy Providers** — supply policies from external authoritative sources; follow same base contract; three delivery modes (push/pull/webhook); three formats (dcm_native/opa_rego/external_schema); trust level governs max authority
-- **Real-world providers** are typically combinations of all three
+- **Process Providers** — purely process-based workflow or automation
+- **Policy Providers** — supply policies; Mode 4 evaluates/enriches via black box query
+- **Message Bus Providers** — bidirectional bridge to external message buses (Kafka, AMQP, NATS, etc.)
+- **Credential Providers** — resolve secrets from external stores (Vault, AWS SM, Azure KV, CyberArk, etc.)
+- **Auth Providers** — authenticate identities and resolve permissions (OIDC, LDAP, AD, FreeIPA, etc.)
+- **Real-world providers** are typically combinations of the above
 
 ---
 
@@ -1723,7 +1726,132 @@ DCM lost entirely → bootstrap installer on new cluster → reads `dcm_deployme
 
 ---
 
-## SECTION 25 — PERSONAS
+## SECTION 25 — WEBHOOKS, MESSAGING, AND EXTERNAL INTEGRATION
+
+### 25.1 The Three Integration Mechanisms
+- **Outbound Webhooks** — DCM pushes event notifications to external HTTP endpoints
+- **Inbound Webhooks** — External systems push requests, queries, and events to DCM
+- **Message Bus Provider** — Persistent bidirectional event streaming with external message buses
+
+All three are authenticated, authorized, and audited identically to any other DCM API call. No privileged back-channel.
+
+### 25.2 Universal Ingress/Egress Actor Model
+
+Every request carries an immutable `ingress` block set by the DCM ingress layer:
+```yaml
+ingress:
+  surface: <web_ui|consumer_api|webhook_inbound|message_bus_inbound|
+            provider_callback|policy_engine|scheduler|rehydration|
+            ingestion|dcm_internal|operator_cli>
+  protocol: <https|amqp|kafka|grpc|websocket>
+  authenticated_via: <hmac_sha256|mtls|bearer_token|oidc|ldap|...>
+  actor:
+    uuid / type / display_name / identity_source
+    auth_provider_uuid / auth_provider_type
+    roles / tenant_scope / groups / permissions
+    authorized_by: {method, authorizing_entity_uuid, expiry}
+    session_uuid / mfa_verified
+    external_identity: {provider, subject, claims}
+  webhook_registration_uuid / message_bus_provider_uuid / parent_request_uuid
+  source_ip  # audit only — never used for authorization
+```
+The ingress block is immutable — policies may read but never modify it. Carried verbatim into audit records. Policies can act on any ingress field (surface, actor.roles, auth_provider_type, mfa_verified, etc.).
+
+Egress calls carry DCM's authenticated identity via the `egress` block: component, authenticated_via, credential_ref, originating_request_uuid.
+
+### 25.3 Outbound Webhooks
+Optional and policy-governed. Profile sets defaults — fsi/sovereign may require via Policy Group.
+
+Key properties:
+- **Schema adapters** — consumer pins to a schema version; DCM transforms forever; 90-day deprecation notice
+- **Managed secret rotation** — automatic with transition window; consumer notified via signed event
+- **Endpoint health** — suspend-not-delete on failure; full config retained for reactivation
+- **Versioned registrations** — standard DCM artifact lifecycle; Git-managed
+- **Sovereignty-aware** — delivery blocked if endpoint jurisdiction incompatible with Tenant sovereignty
+
+Delivery: at-least-once; per-entity ordering guaranteed; cross-entity ordering not guaranteed; `event_uuid` is idempotency key.
+
+### 25.4 Inbound Webhooks
+DCM exposes typed authenticated endpoints:
+- `POST /webhooks/inbound/request` — submit service request
+- `POST /webhooks/inbound/query` — query entity state/catalog
+- `POST /webhooks/inbound/event` — push provider state change / CI/CD signal
+- `POST /webhooks/inbound/ingestion` — push brownfield ingestion data
+- `POST /webhooks/inbound/data` — push enrichment or information data
+
+Callers must be registered as **webhook actors** with role, tenant_scope, permitted_operations, and rate_limit. Full Policy Engine evaluation — same as any other API call. Returns 202 Accepted + request_uuid for async operations.
+
+### 25.5 Message Bus Provider (Sixth Provider Type)
+Persistent bidirectional event streaming. Supports: kafka, amqp, nats, mqtt, azure_service_bus, aws_eventbridge, gcp_pubsub, rabbitmq, custom.
+
+Inbound messages processed as authenticated API calls via registered webhook actor identity. Same Policy Engine evaluation as inbound webhooks.
+
+Architecture: internal Message Bus → Message Bus Bridge Service ↔ external message bus.
+
+### 25.6 Webhook System Policies
+WHK-001 through WHK-014 — see doc 18. Key: ING-008 (ingress block immutable), ING-009 (full actor context required), ING-010 (egress authenticated), ING-011 (no anonymous access), ING-012 (webhook/message bus always authenticated).
+
+---
+
+## SECTION 26 — AUTHENTICATION, AUTHORIZATION, AND AUTH PROVIDERS
+
+### 26.1 Auth Provider — The Eighth Provider Type
+An **Auth Provider** answers two questions: (1) is this identity who they claim to be? and (2) what are they permitted to do? Every authentication mode is an Auth Provider implementation.
+
+**Authentication is always required — no anonymous access in any profile.** The difference between profiles is how much effort setup requires.
+
+### 26.2 Built-In Auth Provider (zero configuration)
+Always registered, cannot be deregistered. Supports:
+- **Static API key** — generated at bootstrap, shown once, 30 seconds to start
+- **Local users** — `dcm user create --username admin --role platform_admin`
+- **GitHub/GitLab OAuth** — opt-in, requires client_id + secret
+
+### 26.3 Auth Modes by Profile
+
+| Profile | Auth Modes | Setup Effort |
+|---------|-----------|-------------|
+| `minimal` | Static API key, Local user/password | 30 seconds – 2 min |
+| `dev` | + GitHub/GitLab OAuth, FreeIPA/AD direct bind | 5–15 minutes |
+| `standard` | + OIDC via broker, AD/FreeIPA direct | 30–60 minutes |
+| `prod` | + OIDC direct, MFA configurable | 1–2 hours |
+| `fsi` | + mTLS required, MFA required | 4–8 hours |
+| `sovereign` | + Air-gapped OIDC/mTLS | 1–2 days |
+
+No anonymous access in any profile. No static API key in standard+. mTLS required in fsi/sovereign.
+
+### 26.4 LDAP / FreeIPA / Active Directory
+FreeIPA: direct LDAP bind with optional Kerberos SSO and HBAC enforcement. Ideal for Red Hat / Linux-first environments.
+
+Active Directory: LDAP bind with `LDAP_MATCHING_RULE_IN_CHAIN` (OID 1.2.840.113556.1.4.1941) for nested group resolution. `sAMAccountName` or UPN for user lookup. Automatic DC failover.
+
+Both support: group_role_map (external groups → DCM roles), tenant_mapping (external groups → DCM Tenants), group_sync (interval-based re-sync), multiple domain controllers for failover.
+
+### 26.5 Multiple Auth Providers and Routing
+Multiple providers registered simultaneously. Ingress layer routes based on authentication signal (mtls_client_cert → mtls provider; bearer_token → OIDC or API key provider; basic_auth → LDAP; hmac_signature → webhook provider; none → reject).
+
+Auth providers can be chained: authentication (LDAP bind) → enrichment (LDAP groups) → augmentation (OIDC userinfo for rich claims like department, cost_center).
+
+### 26.6 Credential Provider (Seventh Provider Type)
+Cross-cutting dependency for all secret resolution. Supports: hashicorp_vault, aws_secrets_manager, azure_key_vault, gcp_secret_manager, kubernetes_secrets, cyberark, delinea, external_api, dcm_internal.
+
+All provider registrations, webhook configurations, and Auth Provider connections reference credentials via:
+```yaml
+secret_ref:
+  credential_provider_uuid: <uuid>
+  secret_path: "dcm/path/to/secret"
+  version: latest
+```
+Credentials never stored in Git. Never appear in audit record values (only secret_path logged). Cached in memory with configurable TTL.
+
+### 26.7 Auth Provider Health
+On unhealthy: existing sessions remain valid until TTL expiry; new auth attempts route to fallback_provider_uuid or are rejected. On_unhealthy options: alert, fallback_to_next, block_new_sessions.
+
+### 26.8 System Policies
+AUTH-001 through AUTH-010 — see doc 19. Key: AUTH-008 (no anonymous access in any profile), AUTH-009 (webhook/message bus always authenticated), AUTH-007 (credentials always via Credential Provider).
+
+---
+
+## SECTION 27 — PERSONAS
 
 | Persona | Primary Concern |
 |---------|----------------|
@@ -1740,7 +1868,7 @@ DCM lost entirely → bootstrap installer on new cluster → reads `dcm_deployme
 
 ---
 
-## SECTION 26 — TERMINOLOGY GLOSSARY
+## SECTION 28 — TERMINOLOGY GLOSSARY
 
 | Term | Definition |
 |------|-----------|
@@ -1919,7 +2047,7 @@ DCM lost entirely → bootstrap installer on new cluster → reads `dcm_deployme
 
 ---
 
-## SECTION 27 — OPEN QUESTIONS
+## SECTION 29 — OPEN QUESTIONS
 
 These items are explicitly unresolved. Do not make assumptions about them — flag them and ask for guidance.
 
@@ -2016,7 +2144,7 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
-## SECTION 28 — DOCUMENTATION STRUCTURE
+## SECTION 30 — DOCUMENTATION STRUCTURE
 
 DCM documentation follows a hierarchical structure:
 
@@ -2064,7 +2192,7 @@ content/
 
 ---
 
-## SECTION 29 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 31 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, follow these instructions:
 
@@ -2113,6 +2241,12 @@ When working on this project, follow these instructions:
 67. **Composite groups default to targeting all member types** — always declare member_type_filter when writing policies that target a composite group unless genuinely intending to govern all member types simultaneously
 68. **Nested tenant governance: most restrictive wins** — a child policy that is more restrictive than a parent policy wins; parent policies cascade where the child has no policy; this is the same principle as save_overrides_destroy and field override control
 69. **former_group_membership records are permanent** — group destruction does not erase membership history; queries against membership history are valid at any time via provenance store; use this for compliance and audit queries about past associations
+75. **Eight provider types — not five** — Message Bus Provider (6), Credential Provider (7), and Auth Provider (8) complete the ecosystem; all follow the same base contract
+76. **The ingress block is the policy surface for all access control** — every request carries surface, protocol, authenticated_via, actor.roles, actor.auth_provider_type, mfa_verified, and external_identity claims; GateKeeper policies act on all of these
+77. **No anonymous access in any profile** — minimal profile uses static API key (30 seconds to set up); the authentication ladder is about setup effort, not whether auth exists; AUTH-008 is non-negotiable
+78. **Credentials always via Credential Provider** — no plaintext credentials anywhere in DCM: not in Git, not in audit records, not in logs; always reference a Credential Provider secret_path
+79. **Auth Providers are versioned artifacts** — role_mapping and tenant_mapping changes go through proposed → active validation; Auth Provider config changes are audited; multiple providers can be registered simultaneously with signal-based routing
+80. **Webhook registrations are versioned artifacts** — Git-managed, lifecycle-governed, schema adapters for long-lived compatibility; inbound callers must be registered as webhook actors with explicit permissions
 71. **Two-stage audit: Stage 1 is the durability guarantee** — the Commit Log quorum write confirms the change is audited; Stage 2 enrichment is asynchronous; Stage 1 timestamp is the authoritative audit timestamp (AUD-013)
 72. **Redundancy is profile-governed — not per-component** — never configure replica counts individually; activate the appropriate Profile and it configures redundancy for the entire deployment
 73. **DCM is self-hosting** — DCM's own deployment is a DCM resource; DCM manages itself through the same four-state model, policy engine, and audit trail used for customer workloads
