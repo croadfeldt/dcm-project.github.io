@@ -1,14 +1,26 @@
 ---
 title: "DCM Operator Interface Specification"
 type: docs
-weight: 1
+weight: 2
 ---
 
-> **⚠️ Active Development Notice**
-> 
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
-> 
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
+
+> ## ⚠️ Work in Progress — Kubernetes Operator Integration
+>
+> **This section is explicitly a work in progress and is less mature than the core DCM data model and architecture documentation.**
+>
+> The Kubernetes operator integration layer — including the Operator Interface Specification, Operator SDK API, and Kubernetes compatibility mappings — represents design intent that has not yet been validated against implementation. Specific interface contracts, API signatures, SDK method names, and CRD structures **will change** as implementation work begins.
+>
+> **Do not build against these specifications yet.** They are published to share design direction and invite feedback, not as stable contracts.
+>
+> Known gaps and open items for this section:
+> - Operator Interface Specification: reconciliation hook signatures are provisional
+> - Operator SDK API: Go module structure and dependency model not yet finalized
+> - Kubernetes Compatibility Mappings: some concept mappings remain under discussion
+> - SDK code examples are illustrative only — not yet tested against a real implementation
+>
+> Feedback and contributions welcome via [GitHub Issues](https://github.com/dcm-project/issues).
+
 
 
 **Version:** 0.1.0-draft  
