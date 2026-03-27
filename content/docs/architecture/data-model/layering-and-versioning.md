@@ -1856,6 +1856,94 @@ request:
 
 ---
 
+## 13b. Override Control and Constraint Visibility Gaps
+
+### 13b.1 Override Preference Enforcement (Q50)
+
+Layer fields declare override intent using three values. The Request Payload Processor enforces this during assembly Step 3 (Layer Merge) — no separate GateKeeper policy required.
+
+```yaml
+fields:
+  dns_servers:
+    value: [10.0.0.53, 10.0.0.54]
+    metadata:
+      override: allow          # lower layers and consumers may change this
+
+  encryption_at_rest:
+    value: true
+    metadata:
+      override: immutable      # no lower-domain layer or consumer may change this
+      lock_reason: "CISO mandate SEC-2024-047 — encryption always required"
+
+  cpu_count:
+    value: 4
+    metadata:
+      override: constrained    # may change within declared bounds
+      constraint:
+        type: range
+        min: 1
+        max: 32
+        step: 1
+      constraint_reason: "Platform capacity planning bounds"
+```
+
+**Authority rule:** `immutable` prevents overrides only from *lower-authority domains*. A `platform` domain field marked `immutable` cannot be changed by `tenant`, `service`, `provider`, or `request` layers — but a `system` domain layer above it can still override it. Higher authority always wins.
+
+**GateKeeper escalation:** A GateKeeper policy at a higher authority level may additionally lock a field that a layer marked `allow` — this is the compliance escape hatch for mandates the layer author did not anticipate.
+
+**Enforcement point:** Step 3 (Layer Merge) — if a lower-priority layer or consumer request sets a field marked `immutable`, assembly halts with a clear error identifying the conflicting layer and the locking layer.
+
+### 13b.2 Constraint Schema Visibility (Q52)
+
+Constrained fields expose their constraint schema to consumers in the Service Catalog UI and Consumer API at a policy-governed disclosure level.
+
+```yaml
+constraint_visibility:
+  level: <full|summary|hidden>
+  # full:    Show constraint type, bounds, constraint_reason, suggested values
+  # summary: Show bounds only — no reason, no suggestions
+  # hidden:  Field appears free-form; constraint silently enforced at submission
+```
+
+**Profile defaults:**
+
+| Profile | Default Level | Rationale |
+|---------|--------------|-----------|
+| `minimal` | `full` | All context helpful |
+| `dev` | `full` | Developers benefit from full schema |
+| `standard` | `full` | Good developer experience |
+| `prod` | `summary` | Bounds visible; reasons may be sensitive |
+| `fsi` | `summary` | Regulatory constraints may not need full exposure |
+| `sovereign` | `hidden` | Constraint details may be operationally sensitive |
+
+**UI rendering (full mode):**
+```
+VM Size — CPU Count
+  Enter a value between 1 and 32 (whole numbers)
+  Suggested: 2, 4, 8, 16
+  Reason: Platform capacity planning bounds
+```
+
+**API endpoint:** `GET /api/v1/catalog/items/{id}/schema` returns field schemas at the declared visibility level for the authenticated consumer's Tenant profile.
+
+Policy may override the profile default per field or resource type:
+```yaml
+policy:
+  type: transformation
+  rule: >
+    If resource_type == Compute.VirtualMachine
+    AND field.name == cpu_count
+    THEN set: constraint_visibility.level = full
+```
+
+### 13b.3 System Policies — Override Control
+
+| Policy | Rule |
+|--------|------|
+| `LAY-005` | Layer fields declare override intent as allow, constrained, or immutable. The Request Payload Processor enforces override declarations during assembly Step 3. immutable prevents overrides from lower-authority domains only — higher-domain layers may always override. GateKeeper policies may additionally lock allow or constrained fields at runtime. |
+| `LAY-006` | Constraint schemas on constrained fields are visible to consumers in the Service Catalog UI and Consumer API at a policy-governed disclosure level: full (constraint, bounds, reason, suggestions), summary (bounds only), or hidden (enforced but not displayed). Profile sets the default. Policy may override per field or resource type. |
+
+
 ## 13a. Layer System Policies
 
 | Policy | Rule |
@@ -1877,9 +1965,9 @@ request:
 | 4 | How are Service Layers registered and versioned relative to Service Provider registration? | Provider contract | ✅ Resolved — independently versioned; provider declares semver compatibility; cache invalidation on version change (LAY-002) |
 | 5 | Should assembly support conditional layer inclusion? | Assembly flexibility | ✅ Resolved — activation_condition on layers; evaluated in Step 2; references request, tenant, resource type, core layer, and ingress fields (LAY-003) |
 | 6 | How does the layer chain interact with service dependencies? | Dependency model | ✅ Resolved — each dependency has its own layer chain; inherits parent resolved placement context; no consumer declaration inheritance (LAY-004) |
-| 7 | Should `override_preference` be declarable in layer definitions as a hint to the Policy Engine? | Override control | ❓ Unresolved |
-| 8 | When `override_preference: immutable` is set by a Global policy, can a higher-priority Global policy still override it? | Override control precedence | ❓ Unresolved |
-| 9 | Should the `constraint_schema` on a constrained field be visible to consumers in the Service Catalog UI? | Consumer experience | ❓ Unresolved |
+| 7 | Should `override_preference` be declarable in layer definitions as a hint to the Policy Engine? | Override control | ✅ Resolved — override: allow/constrained/immutable enforced by Request Payload Processor at Step 3; GateKeeper may additionally lock (LAY-005) |
+| 8 | When `override_preference: immutable` is set — can a higher-priority policy still override it? | Override control precedence | ✅ Resolved — immutable prevents lower-authority overrides only; higher-domain layers always win; GateKeeper can additionally lock (LAY-005) |
+| 9 | Should the `constraint_schema` on a constrained field be visible to consumers in the Service Catalog UI? | Consumer experience | ✅ Resolved — full/summary/hidden disclosure levels; profile-governed defaults; API endpoint returns schema at declared visibility (LAY-006) |
 | 10 | Should the background validation job for detecting post-ingestion conflicts run on a schedule or be event-triggered? | Operational | ❓ Unresolved |
 | 11 | What is the minimum validation review period for a proposed policy before it can be activated? | Policy governance | ❓ Unresolved |
 

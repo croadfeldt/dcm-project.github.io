@@ -2282,7 +2282,88 @@ Observability events on Message Bus do NOT replace audit records. OBS-001.
 
 ---
 
-## SECTION 38 — PERSONAS
+## SECTION 38 — OVERRIDE CONTROL AND ENHANCEMENT GAPS
+
+### 38.1 The Complete Field Lifecycle Contract
+
+Three questions together define the full field governance model across a resource's lifecycle:
+
+```
+ASSEMBLY TIME (Q50 — override_preference):
+  Which layers can set this field?
+  immutable → only this layer and higher-domain layers
+  constrained → any layer within declared bounds
+  allow → any layer
+
+CATALOG PRESENTATION (Q52 — constraint_visibility):
+  What does the consumer see about this field's constraints?
+  full → constraint + bounds + reason + suggestions
+  summary → bounds only
+  hidden → enforced silently
+
+POST-REALIZATION (Q56 — editability):
+  Can the consumer change this field after provisioning?
+  editable: false → requires reprovisioning
+  editable: true → targeted delta update permitted (within edit_constraints)
+```
+
+### 38.2 Override Preference Enforcement (Q50)
+
+`override: allow | constrained | immutable` on layer fields is enforced by the Request Payload Processor during assembly **Step 3 (Layer Merge)**. No separate GateKeeper policy needed.
+
+**Authority rule:** `immutable` prevents overrides from lower-authority domains only. A platform domain `immutable` field blocks tenant/service/provider/request — but system domain can still override. Higher authority always wins.
+
+**GateKeeper escalation:** A GateKeeper policy may additionally lock an `allow` or `constrained` field at runtime — for compliance mandates the layer author didn't anticipate.
+
+**Enforcement:** If a lower-priority layer or consumer sets an `immutable` field → assembly halts with clear error identifying the conflicting layer and locking layer.
+
+LAY-005.
+
+### 38.3 Constraint Schema Visibility (Q52)
+
+Constrained fields expose their constraint schema to consumers in the Service Catalog UI and Consumer API at a policy-governed disclosure level.
+
+**Disclosure levels:** `full` (constraint + bounds + reason + suggestions), `summary` (bounds only), `hidden` (silently enforced)
+
+**Profile defaults:** minimal/dev/standard → full; prod/fsi → summary; sovereign → hidden
+
+**API:** `GET /api/v1/catalog/items/{id}/schema` returns field schemas at the declared visibility level for the authenticated consumer's Tenant profile.
+
+Policy may override per field or resource type.
+
+LAY-006.
+
+### 38.4 Post-Realization Field Editability (Q56)
+
+**Editability is orthogonal to override_preference:**
+- `override` governs assembly time (which layers can set the field during request construction)
+- `editable` governs post-realization (can the consumer update the field on a running resource)
+
+**Declared on Resource Type Specification:**
+```yaml
+fields:
+  cpu_count:    editable: true; edit_constraints: {range: 1-32}; requires_restart: true
+  hostname:     editable: false; non_editable_reason: "Requires reprovisioning"
+  dns_servers:  editable: true; requires_restart: false
+  region:       editable: false; non_editable_reason: "Region immutable post-realization"
+```
+
+**Update request flow:** validate editable → validate edit_constraints → evaluate edit_policy → produce delta Requested State → dispatch delta to provider → update Realized State
+
+**Critical:** Updates are targeted deltas — **layers do NOT re-run**. Only changed fields validated and dispatched. Layer chain NOT re-assembled for updates.
+
+Editable fields and edit_constraints visible in Service Catalog at same constraint_visibility level as constraint schemas.
+
+ENT-010.
+
+### 38.5 System Policies
+- `LAY-005` — override: allow/constrained/immutable enforced at Step 3; immutable = lower-authority only; GateKeeper may additionally lock
+- `LAY-006` — constraint schema visible at full/summary/hidden level; profile-governed; API endpoint
+- `ENT-010` — editability first-class on Resource Type Spec; independent of override_preference; updates = targeted deltas; layers do not re-run
+
+---
+
+## SECTION 39 — PERSONAS
 
 | Persona | Primary Concern |
 |---------|----------------|
@@ -2299,7 +2380,7 @@ Observability events on Message Bus do NOT replace audit records. OBS-001.
 
 ---
 
-## SECTION 39 — TERMINOLOGY GLOSSARY
+## SECTION 40 — TERMINOLOGY GLOSSARY
 
 | Term | Definition |
 |------|-----------|
@@ -2362,6 +2443,13 @@ Observability events on Message Bus do NOT replace audit records. OBS-001.
 | **Raft** | Consensus protocol used by Commit Log (etcd) for quorum writes; guarantees durability even if minority of replicas fail |
 | **DCMGroup** | Universal group entity — all grouping constructs in DCM expressed as DCMGroup with group_class |
 | **group_class** | Determines system behavior of a DCMGroup — closed built-in set: tenant_boundary, resource_grouping, policy_collection, policy_profile, layer_grouping, composite, federation |
+| **override: allow/constrained/immutable** | Layer field metadata declaring override intent; enforced by Request Payload Processor at Step 3; immutable prevents lower-authority overrides only; GateKeeper may additionally lock |
+| **constraint_visibility** | Policy-governed disclosure level for constrained fields: full (constraint+bounds+reason+suggestions), summary (bounds only), hidden (silently enforced) |
+| **editable** | Resource Type Spec field declaration: can this field be modified post-realization via a targeted delta update (true) or only via reprovisioning (false) |
+| **edit_constraints** | Bounds declared on editable fields: range, list, enum; validated at update time; same constraint types as assembly-time constraints |
+| **requires_restart** | Editable field flag indicating whether a provider restart action is needed to apply the update |
+| **targeted delta** | Update mechanism for editable fields: applies only changed fields to Realized State; does NOT re-run the layer assembly chain |
+| **non_editable_reason** | Human-readable explanation on non-editable fields explaining why reprovisioning is required to change them |
 | **confidence_descriptor** | Primary confidence data model: authority_level (from registration), corroboration (from ingestion), source_trust (from trust system), last_updated_at (from push) — stored fields |
 | **freshness** | Derived confidence field computed at query time from (now - last_updated_at) vs thresholds: high (<1h), medium (<1d), low (<7d), stale (>7d) |
 | **corroboration** | Confidence descriptor field: confirmed (2+ sources agree), single_source, contested (sources disagree) |
@@ -2484,7 +2572,7 @@ Observability events on Message Bus do NOT replace audit records. OBS-001.
 
 ---
 
-## SECTION 40 — OPEN QUESTIONS
+## SECTION 41 — OPEN QUESTIONS
 
 These items are explicitly unresolved. Do not make assumptions about them — flag them and ask for guidance.
 
@@ -2581,7 +2669,7 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
-## SECTION 41 — DOCUMENTATION STRUCTURE
+## SECTION 42 — DOCUMENTATION STRUCTURE
 
 DCM documentation follows a hierarchical structure:
 
@@ -2629,7 +2717,7 @@ content/
 
 ---
 
-## SECTION 42 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 43 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, follow these instructions:
 
@@ -2678,6 +2766,9 @@ When working on this project, follow these instructions:
 67. **Composite groups default to targeting all member types** — always declare member_type_filter when writing policies that target a composite group unless genuinely intending to govern all member types simultaneously
 68. **Nested tenant governance: most restrictive wins** — a child policy that is more restrictive than a parent policy wins; parent policies cascade where the child has no policy; this is the same principle as save_overrides_destroy and field override control
 69. **former_group_membership records are permanent** — group destruction does not erase membership history; queries against membership history are valid at any time via provenance store; use this for compliance and audit queries about past associations
+115. **Three independent field governance mechanisms cover the full lifecycle** — override_preference (assembly time: which layers can set), constraint_visibility (catalog: what consumers see), editability (post-realization: what consumers can change); all three are orthogonal and compose
+116. **Updates are targeted deltas — layers never re-run on updates** — PATCH requests validate editable fields and edit_constraints then dispatch a delta; the layer assembly chain is not re-invoked; this preserves original assembly integrity while allowing operational changes
+117. **immutable override only blocks lower-authority domains** — a platform domain immutable field blocks tenant/service/provider/request; it does not block system domain; higher authority always wins; GateKeeper can additionally lock allow/constrained fields for compliance mandates
 111. **Confidence descriptor is primary — score and band are derived** — authority_level/corroboration/source_trust/last_updated_at are stored facts; freshness/score/band computed at query time from stored facts; never stored as primary (avoids staleness); all reconstructable from audit records
 112. **source_trust drives the confidence trust_multiplier** — verified=1.00, degraded=0.75, suspended=0.00; maintained by dual-trigger trust scoring (event-triggered + weekly scheduled); push failures and schema errors degrade trust automatically
 113. **Audit and Observability answer different questions** — Audit: what happened and who authorized it; Observability: is the system healthy; different consumers, opposite storage trade-offs; Observability may reference audit record UUIDs but lives in a separate store
