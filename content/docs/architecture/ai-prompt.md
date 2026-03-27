@@ -1918,7 +1918,98 @@ ENT-001 through ENT-009 — see docs 06 and 07.
 
 ---
 
-## SECTION 32 — PERSONAS
+## SECTION 32 — INFORMATION PROVIDER CONFIDENCE SCORING AND AUTHORITY
+
+### 32.1 Confidence Scoring — 0 to 100
+Every Information Provider field value carries a confidence score (0-100). DCM computes scores — providers do not self-declare. Score bands for policy use: very_high (81-100), high (61-80), medium (41-60), low (21-40), very_low (0-20).
+
+**Formula:**
+```
+confidence_score = min(100, base_score × freshness_multiplier × corroboration_multiplier × authority_multiplier)
+```
+
+| Factor | Values |
+|--------|--------|
+| Base score | primary_authoritative=90, secondary=70, discovered=60, advisory=50, self_reported=40, inferred=30 |
+| Freshness | <1h=1.00, <1d=0.95, <7d=0.85, <30d=0.70, >30d=0.50 |
+| Corroboration | 1 source=1.00, 2 agree=1.10, 3+ agree=1.15, disagree=0.60 |
+| Authority | primary=1.00, secondary=0.85, advisory=0.70 |
+
+### 32.2 Authority as Layer Data
+Authority scope and priority for Information Providers are declared in **platform or system domain layers** — not just policies. This is static organizational knowledge ("our CMDB is authoritative for business unit data"). Layer-defined authority establishes the default; policies act on confidence scores at runtime.
+
+### 32.3 Ingestion-Time Conflict Detection
+Conflict detection at ingestion time (7-step flow): schema validation → authority scope check → confidence score computation → conflict detection → resolution policy → entity record update → INGEST audit record.
+
+**Resolution strategies:** `higher_authority_wins` | `higher_confidence_wins` | `higher_priority_wins` | `escalate` | `merge` (array fields only)
+
+Authority scope conflicts detected at **registration time** — two providers claiming primary authority for the same field cannot both go active without explicit resolution.
+
+### 32.4 Write-Back (Q63)
+Optional declared capability. Policy triggers write-back — never automatic. Produces ENRICH audit records. Credentials via Credential Provider. (INF-002)
+
+### 32.5 Extended Schema Versioning (Q64)
+Semver semantics: field removal/type change = major (breaking); new optional field = minor; constraint change = revision. Migration plan required for major bumps. (INF-003)
+
+### 32.6 Well-Known Provider Registry (Q65)
+Three-tier registry (Core/Community/Organization) — same governance model as Resource Type Registry. Separate registries, shared infrastructure. (INF-004)
+
+### 32.7 Air-Gapped Verification (Q66)
+Three modes: pre-verified signed bundle, internal mTLS (for internal providers), periodic online re-verification with cached tokens. Profile governs cache expiry behavior. (INF-005)
+
+### 32.8 System Policies
+INF-001 through INF-008 — see docs 10 and 21.
+
+---
+
+## SECTION 33 — DCM FEDERATION AND CROSS-INSTANCE COORDINATION
+
+### 33.1 Three Relationship Types
+- **Peer DCM** — same organizational level; share resources/information
+- **Parent-Child DCM** — hierarchical; parent has governance overlay; does not own child resources
+- **Hub DCM** — specialized parent as resource allocation clearinghouse
+
+All use the Universal Group Model: federation group (peers) or tenant_boundary nesting (parent-child).
+
+### 33.2 Provider Federation Eligibility
+Every provider registration declares `federation_eligibility`:
+- `mode: none` — cannot participate in any federation (sovereign/classified providers)
+- `mode: selective` — only with explicitly declared partners
+- `mode: open` — any trusted DCM peer (sovereignty checks always apply)
+
+**Layer-defined defaults** in `platform` domain layer. Individual registrations may be **more restrictive** — never more permissive without GateKeeper approval.
+
+**Federation scope declares:** permitted resource types + operations, data sharing permissions, max concurrent allocations. Remote DCMs CANNOT decommission local resources through a tunnel.
+
+**Storage providers default to `mode: none`** — data sovereignty prohibits storage federation unless explicitly authorized.
+
+### 33.3 The DCM Provider — Ninth Provider Type
+Wraps another DCM instance's API. Always mTLS (non-configurable). Sovereignty checks mandatory before tunnel establishment. Local DCM policies govern ALL resources from any tunnel.
+
+**Non-negotiable primary concerns on all tunnels:**
+- Sovereignty: verified before establishment; data classification checked per egress
+- Authentication: always mTLS — no API key or bearer token
+- Authorization: local policies govern; remote policies cannot override
+- Audit: records in BOTH DCM instances; shared correlation_id
+- Observability: cross-DCM allocation visible in both instances
+
+### 33.4 Cross-DCM Confidence Scoring
+```
+cross_dcm_confidence = source_resource_confidence × (tunnel_trust_score / 100)
+```
+Federation trust score (0-100): factors include identity verification, sovereignty compatibility, certifications currency, audit trail integrity, uptime, compliance.
+
+### 33.5 DCM Export/Import
+Signed export package: tenants, layers, policies, provider registrations (not credentials), entity intent/requested states, groups, audit records with hash chain. Never export credentials.
+
+Import trust score (0-100): source verification + sovereignty compatibility + data completeness + schema compatibility + audit trail integrity. Low score → reject or escalate.
+
+### 33.6 System Policies
+DCM-001 through DCM-008 — see doc 22.
+
+---
+
+## SECTION 34 — PERSONAS
 
 | Persona | Primary Concern |
 |---------|----------------|
@@ -1935,7 +2026,7 @@ ENT-001 through ENT-009 — see docs 06 and 07.
 
 ---
 
-## SECTION 33 — TERMINOLOGY GLOSSARY
+## SECTION 35 — TERMINOLOGY GLOSSARY
 
 | Term | Definition |
 |------|-----------|
@@ -2114,7 +2205,7 @@ ENT-001 through ENT-009 — see docs 06 and 07.
 
 ---
 
-## SECTION 34 — OPEN QUESTIONS
+## SECTION 36 — OPEN QUESTIONS
 
 These items are explicitly unresolved. Do not make assumptions about them — flag them and ask for guidance.
 
@@ -2211,7 +2302,7 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
-## SECTION 35 — DOCUMENTATION STRUCTURE
+## SECTION 37 — DOCUMENTATION STRUCTURE
 
 DCM documentation follows a hierarchical structure:
 
@@ -2259,7 +2350,7 @@ content/
 
 ---
 
-## SECTION 36 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 38 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, follow these instructions:
 
@@ -2308,6 +2399,10 @@ When working on this project, follow these instructions:
 67. **Composite groups default to targeting all member types** — always declare member_type_filter when writing policies that target a composite group unless genuinely intending to govern all member types simultaneously
 68. **Nested tenant governance: most restrictive wins** — a child policy that is more restrictive than a parent policy wins; parent policies cascade where the child has no policy; this is the same principle as save_overrides_destroy and field override control
 69. **former_group_membership records are permanent** — group destruction does not erase membership history; queries against membership history are valid at any time via provenance store; use this for compliance and audit queries about past associations
+97. **Confidence scoring is computed by DCM — never self-declared** — the formula (base_score × freshness × corroboration × authority) is standardized and auditable; policies work on bands (very_high/high/medium/low/very_low) not raw values
+98. **Information Provider authority is layer-defined** — static organizational knowledge ("our CMDB is authoritative for business unit") belongs in a platform domain layer; conflict detection happens at ingestion time; policy governs automated resolution
+99. **DCM Provider is the ninth provider type** — always mTLS (non-configurable); sovereignty checks mandatory; local policies govern ALL federated resources; audit records in both DCM instances with shared correlation_id
+100. **Provider federation eligibility is layer-defined with policy enforcement** — platform layer sets defaults per provider type; individual registrations may be more restrictive; storage providers default to mode: none; remote DCMs cannot decommission local resources through tunnels
 93. **Process Resource max_execution_time is mandatory** — it is not optional metadata; enforced by the Lifecycle Constraint Enforcer; profile governs the default on_max_exceeded action (notify/escalate/terminate)
 94. **Dependency graphs are embedded, not separate entities** — declared graph in Resource Type Specification; resolved graph in placement.yaml (Requested State); realized graph in Realized State events; no separate dependency graph artifact needed
 95. **Billing state is first-class — not metadata** — DCM carries the billing_state field; policy determines the billing model per resource type and state; Cost Analysis consumes it; organizations decide what is billable

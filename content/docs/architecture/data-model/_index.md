@@ -33,5 +33,7 @@ realization, operation, and decommission.
   {{< card link="webhooks-messaging" title="Webhooks and Messaging" icon="arrows-expand" subtitle="Inbound and outbound webhooks. Message Bus Provider. Universal ingress/egress actor model. Credential Provider. WHK and ING policies." >}}
   {{< card link="auth-providers" title="Auth Providers" icon="lock-closed" subtitle="Eight provider types. Auth ladder from API key to air-gapped OIDC. LDAP, FreeIPA, AD, OIDC, mTLS. No anonymous access. AUTH policies." >}}
   {{< card link="registry-governance" title="Registry Governance" icon="collection" subtitle="Three-tier registry. PR-based proposals. Default deprecation policies. Cost-aware placement. Federated with air-gap signed bundles." >}}
+  {{< card link="information-providers-advanced" title="Information Provider Confidence" icon="chart-bar" subtitle="0-100 confidence scoring. Authority as layer data. Ingestion-time conflict detection. Write-back. Schema versioning. INF-001 through INF-008." >}}
+  {{< card link="dcm-federation" title="DCM Federation" icon="globe" subtitle="Peer, parent-child, hub relationships. Provider federation eligibility. DCM Provider (ninth type). Always mTLS. Cross-DCM confidence scoring. DCM-001 through DCM-008." >}}
   {{< card link="universal-groups" title="Universal Group Model" icon="view-grid" subtitle="Unified grouping: Tenants, Resource Groups, Policy Groups as one model. Composite groups, nested and federated Tenants, permanent membership history." >}}
 {{< /cards >}}
