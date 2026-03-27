@@ -2443,7 +2443,13 @@ The Ship/Shore/Enclave terminology from defense IT contexts has been replaced th
 
 | Former Term | Replacement | Meaning |
 |-------------|-------------|---------|
-| Shore | **certified profile** | DCM profile carrying formal third-party certification metadata (HIPAA assessor, FedRAMP JAB, PCI QSA); promoted to Tier 1; applies to artifact not deployment |
+| Shore | **federation routing** | Hub DCM applies placement engine logic at the DCM instance level; Regional DCMs are DCM Provider instances; sovereignty is a hard pre-filter; same tie-breaking hierarchy as provider selection |
+| **independent_with_overlap** | Certificate rotation model: old cert valid P30D after new cert issued; allows peers to update trust stores without coordinated downtime |
+| **alert_and_hold** | Federated drift detection response when peer DCM is unavailable: do not assume drift; hold state; escalate to platform admin after PT24H |
+| **AUDIT_STORE_UNAVAILABLE** | Gap record inserted in Audit Store hash chain after recovery from Audit Store failure; timestamps the exact outage window; makes gap explicit and auditable |
+| **confidence aggregation** | Per-entity endpoint computing overall confidence band (= lowest field band); identifies contested and stale fields; computed on demand never stored |
+| **explicit_no_filter** | Composite group declaration suppressing the no member_type filter linting warning; confirms broad targeting is intentional |
+| **certified profile** | DCM profile carrying formal third-party certification metadata (HIPAA assessor, FedRAMP JAB, PCI QSA); promoted to Tier 1; applies to artifact not deployment |
 | **POLICY_PROVIDER_ELEVATED** | Audit action recorded when a Policy Provider's mode level is elevated; always produced regardless of profile |
 | **tier_certifications** | Certification metadata on Resource Type Specs or profiles from recognized certifying bodies; filter criterion, not structural tier boundary |
 | **tier_3_to_tier_2_promotion** | PR-based pathway for organizations to promote internal Tier 3 Resource Types to Verified Community (Tier 2); requires production deployment, OSS license, named maintainer, migration path |
@@ -2618,7 +2624,65 @@ Static declaration or dynamic Cost Analysis sourcing; hybrid recommended (Cost A
 
 ---
 
-## SECTION 43 — PERSONAS
+## SECTION 43 — FEDERATION, OBSERVABILITY, AND FINAL REFINEMENTS
+
+### 43.1 DCM-to-DCM Certificate Rotation (Federation Q1)
+
+Independent rotation per instance with P30D overlap period. Peers notified via Message Bus 60 days before expiry. Automatic renewal triggers 90 days before expiry. Overlap allows peers to update trust stores without coordinated downtime. DCM-009.
+
+### 43.2 Federation Routing — Full Placement Engine at DCM Level (Federation Q2 — Extended)
+
+**Hub DCM federation routing follows the same placement engine logic as provider selection.** Regional DCMs are treated as DCM Provider instances.
+
+**Sovereignty is a hard pre-filter — not a tie-breaker:**
+- Filter eligible Regional DCMs by sovereignty compatibility before the placement loop
+- No eligible Regional DCMs after filter → reject with clear error
+
+**Tie-breaking hierarchy at the DCM instance level (same as provider selection):**
+1. Policy preference (policy declares preferred Regional DCM)
+2. Federation priority (numeric priority on DCM Provider registration)
+3. Tenant affinity (Tenant's resources prefer a specific Regional DCM)
+4. Sovereignty match quality (exact over partial match)
+5. Geographic affinity (closest regional to consumer)
+6. Least loaded (capacity utilization)
+7. Consistent hash (deterministic tiebreaker)
+
+**Sub-regional routing:** Regional DCM acts as Hub for its children — same logic recursive within federation depth limit. Load balancing is step 6 (least loaded) — not a primary strategy.
+
+DCM-010.
+
+### 43.3 Federated Drift Detection Ownership (Federation Q3)
+
+Provider-side DCM discovers; consumer-side DCM compares against its Requested State. Discovered State events published via federation Message Bus with correlation_id + consumer_dcm_uuid tag. Peer DCM unavailable = alert-and-hold (not assumed drift); max hold PT24H then escalate. DCM-011.
+
+### 43.4 Cross-DCM Audit Correlation (Federation Q4)
+
+No full synchronization. correlation_id reference model — each DCM keeps its own authoritative audit trail. On-demand pull for compliance investigations requires platform admin auth + sovereignty check + peer DCM authorization. DCM-012.
+
+### 43.5 Maximum Federation Depth (Federation Q5)
+
+Profile-governed: minimal/dev=5, standard/prod=3, fsi/sovereign=2. Measured as hops from deepest instance to Hub DCM. Depth 3 covers Hub → Regional → Sub-Regional → Edge. DCM-013.
+
+### 43.6 Audit Provenance Scattered Resolutions
+
+- **Q1 (Audit Store architecture):** Already resolved as STO-004 — specialized Storage Provider sub-type; see doc 11.
+- **Q2 (Air-gapped replication):** Live sync for Regional DCMs; signed bundle export for Sovereign DCMs; sovereignty check required; hash chain preserved; AUD-018.
+- **Q3 (Default dashboard):** Grafana bundled for minimal/dev/standard; enterprise integration recommended for prod; required for fsi; local-only for sovereign; OBS-002.
+- **Q4 (Failing Storage Provider):** Two-stage model handles it — Commit Log (etcd) independent of Storage Providers; AUDIT_STORE_UNAVAILABLE gap record on recovery; hash chain makes gap explicit; AUD-019.
+
+### 43.7 Universal Groups — Composite Linting (Q1)
+
+Linting warning (not error) when composite group policy targeting has no member_type filter. Operator may suppress with explicit_no_filter: true. GRP-016.
+
+### 43.8 Information Provider — Confidence Aggregation (Q2) and Override Notifications (Q3)
+
+**Confidence aggregation API:** GET /api/v1/entities/{uuid}/confidence — overall band = lowest field band (conservative); computed on demand; identifies contested and stale fields. INF-010.
+
+**Override notifications:** Provider opt-in via conflict_notification in registration; webhook or Message Bus; overriding value may be redacted by policy for confidentiality. INF-011.
+
+---
+
+## SECTION 44 — PERSONAS
 
 | Persona | Primary Concern |
 |---------|----------------|
@@ -2635,7 +2699,7 @@ Static declaration or dynamic Cost Analysis sourcing; hybrid recommended (Cost A
 
 ---
 
-## SECTION 44 — TERMINOLOGY GLOSSARY
+## SECTION 45 — TERMINOLOGY GLOSSARY
 
 | Term | Definition |
 |------|-----------|
@@ -2698,6 +2762,12 @@ Static declaration or dynamic Cost Analysis sourcing; hybrid recommended (Cost A
 | **Raft** | Consensus protocol used by Commit Log (etcd) for quorum writes; guarantees durability even if minority of replicas fail |
 | **DCMGroup** | Universal group entity — all grouping constructs in DCM expressed as DCMGroup with group_class |
 | **group_class** | Determines system behavior of a DCMGroup — closed built-in set: tenant_boundary, resource_grouping, policy_collection, policy_profile, layer_grouping, composite, federation |
+| **federation routing** | Hub DCM applies placement engine logic at the DCM instance level; Regional DCMs are DCM Provider instances; sovereignty is a hard pre-filter; same tie-breaking hierarchy as provider selection |
+| **independent_with_overlap** | Certificate rotation model: old cert valid P30D after new cert issued; allows peers to update trust stores without coordinated downtime |
+| **alert_and_hold** | Federated drift detection response when peer DCM is unavailable: do not assume drift; hold state; escalate to platform admin after PT24H |
+| **AUDIT_STORE_UNAVAILABLE** | Gap record inserted in Audit Store hash chain after recovery from Audit Store failure; timestamps the exact outage window; makes gap explicit and auditable |
+| **confidence aggregation** | Per-entity endpoint computing overall confidence band (= lowest field band); identifies contested and stale fields; computed on demand never stored |
+| **explicit_no_filter** | Composite group declaration suppressing the no member_type filter linting warning; confirms broad targeting is intentional |
 | **certified profile** | DCM profile carrying formal third-party certification metadata (HIPAA assessor, FedRAMP JAB, PCI QSA); promoted to Tier 1; applies to artifact not deployment |
 | **POLICY_PROVIDER_ELEVATED** | Audit action recorded when a Policy Provider's mode level is elevated; always produced regardless of profile |
 | **tier_certifications** | Certification metadata on Resource Type Specs or profiles from recognized certifying bodies; filter criterion, not structural tier boundary |
@@ -2856,7 +2926,7 @@ Static declaration or dynamic Cost Analysis sourcing; hybrid recommended (Cost A
 
 ---
 
-## SECTION 45 — OPEN QUESTIONS
+## SECTION 46 — OPEN QUESTIONS
 
 These items are explicitly unresolved. Do not make assumptions about them — flag them and ask for guidance.
 
@@ -2953,7 +3023,7 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
-## SECTION 46 — DOCUMENTATION STRUCTURE
+## SECTION 47 — DOCUMENTATION STRUCTURE
 
 DCM documentation follows a hierarchical structure:
 
@@ -3001,7 +3071,7 @@ content/
 
 ---
 
-## SECTION 47 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 48 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, follow these instructions:
 

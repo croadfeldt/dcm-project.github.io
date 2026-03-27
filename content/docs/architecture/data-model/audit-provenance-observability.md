@@ -12,7 +12,7 @@ weight: 11
 
 
 **Document Status:** 🔄 In Progress  
-**Related Documents:** [Four States](../four-states/) | [Storage Providers](../storage-providers/) | [Context and Purpose](../context-and-purpose/)
+**Related Documents:** [Four States](02-four-states.md) | [Storage Providers](11-storage-providers.md) | [Context and Purpose](00-context-and-purpose.md)
 
 ---
 
@@ -40,7 +40,7 @@ Audit queries provenance to answer its questions. Observability does not use pro
 
 ### 2.2 Provenance Structure
 
-See [Context and Purpose — Section 4.4](../context-and-purpose/) for the complete field-level provenance structure. The key elements:
+See [Context and Purpose — Section 4.4](00-context-and-purpose.md) for the complete field-level provenance structure. The key elements:
 
 ```yaml
 field_name:
@@ -346,10 +346,10 @@ Persona-based access control is enforced at the API Gateway level for all endpoi
 
 | # | Question | Impact | Status |
 |---|----------|--------|--------|
-| 1 | Should the Audit Store be a specialized Storage Provider or can a general Event Stream Store satisfy the audit contract? | Architecture | ❓ Unresolved |
-| 2 | How are audit records replicated across sites in air-gapped or geographically distributed deployments? | Sovereignty | ❓ Unresolved |
-| 3 | Should DCM provide a default observability dashboard or only the telemetry? | Deployment | ❓ Unresolved |
-| 4 | How does the Audit component handle provenance events from a Storage Provider that has been deregistered? | Operational | ❓ Unresolved |
+| 1 | Should the Audit Store be a specialized Storage Provider or can a general Event Stream Store satisfy the audit contract? | Architecture | ✅ Resolved — specialized Storage Provider sub-type; append-only; hash chain integrity; reference-based retention; compliance queries; see doc 11 (STO-004) |
+| 2 | How are audit records replicated across sites in air-gapped or geographically distributed deployments? | Sovereignty | ✅ Resolved — live sync for Regional DCMs; signed bundle for Sovereign DCMs; sovereignty check required; hash chain preserved across transport (AUD-018) |
+| 3 | Should DCM provide a default observability dashboard or only the telemetry? | Deployment | ✅ Resolved — default Grafana dashboard for minimal/dev/standard; enterprise integration recommended for prod; required for fsi; local-only for sovereign (OBS-002) |
+| 4 | How does the Audit component handle provenance events from a Storage Provider that has been deregistered? | Operational | ✅ Resolved — two-stage model handles this; Commit Log independent of Storage Providers; gap record inserted on Audit Store recovery; chain makes gap explicit (AUD-019) |
 
 ---
 
@@ -362,6 +362,94 @@ Persona-based access control is enforced at the API Gateway level for all endpoi
 - **API Gateway** — unified access point for all DCM capabilities including audit and observability
 - **Drift Detection** — uses discovered vs realized state comparison; drift events feed the Audit component
 - **Unsanctioned Change** — a specific audit event type triggered by unauthorized resource modification
+
+
+## 7. Audit Provenance Observability Gap Resolutions
+
+### 7.1 Audit Store Architecture (Q1)
+
+Resolved as STO-004 in doc 11 (Storage Providers). The Audit Store is a specialized Storage Provider sub-type — append-only with immutability enforcement, hash chain integrity, reference-based retention tracking, and compliance-grade multi-dimensional queries. The Event Stream is the delivery channel only, not the compliance destination.
+
+### 7.2 Audit Record Replication Across Sites (Q2)
+
+Each DCM instance maintains its own Audit Store. Replication uses live sync (Regional DCMs with connectivity) or signed bundle export (Sovereign DCMs without connectivity).
+
+```yaml
+audit_replication:
+  model: <live_sync|signed_bundle|per_instance_only>
+
+  live_sync:                        # Regional DCMs with Hub connectivity
+    direction: regional_to_hub      # Regional pushes aggregated view to Hub
+    filters:
+      include: [SECURITY, GATEKEEPER_TRIGGERED, SOVEREIGNTY_VIOLATION]
+    sovereignty_check: required     # before any replication
+
+  signed_bundle:                    # Sovereign DCMs
+    export_on: [scheduled, connectivity_window, on_demand]
+    schedule: "0 0 * * 0"           # weekly during connectivity window
+    encryption: required
+    hash_chain_preserved: true      # chain integrity maintained across transport
+    import_at: hub_dcm_audit_store
+
+  per_instance_only:                # fully isolated Sovereign DCMs
+    export_on_request: via_signed_bundle_manual_transfer
+```
+
+### 7.3 Default Observability Dashboard (Q3)
+
+DCM ships a default Grafana-based observability dashboard for minimal/dev/standard profiles.
+
+```yaml
+default_observability_dashboard:
+  implementation: grafana
+  pre_built_dashboards:
+    - dcm_overview              # request throughput, error rates, component health
+    - resource_lifecycle        # entity state transitions, rehydration activity
+    - policy_evaluation         # GateKeeper triggers, shadow results, validation failures
+    - provider_health           # provider availability, capacity confidence, trust scores
+    - audit_integrity           # hash chain status, pending forwards, chain breaks
+    - federation_status         # federation tunnel health, cross-DCM traffic
+  profile_behavior:
+    minimal: included
+    dev: included
+    standard: included_optional         # shipped; organizations may substitute
+    prod: integration_recommended       # integrate with enterprise observability
+    fsi: integration_required
+    sovereign: local_only               # local Grafana; no external connections
+  export_formats: [prometheus, opentelemetry, json]
+```
+
+### 7.4 Audit Component Handling Failing Storage Provider (Q4)
+
+The two-stage audit model handles this by design — the Stage 1 Commit Log (etcd) has no dependency on any Storage Provider.
+
+```
+Storage Provider failure detected
+  │
+  ▼ Stage 1 Commit Log (etcd) — independent of Storage Provider
+  │   Records: STORAGE_PROVIDER_FAILURE event immediately
+  │
+  ▼ Stage 2 Audit Forward Service — async, after recovery
+  │   Forwards accumulated events including the failure event itself
+  │
+  ▼ For Audit Store self-failure specifically:
+      Commit Log accumulates events as pending_forward
+      On recovery: queue drains in order
+      AUDIT_STORE_UNAVAILABLE gap record inserted with exact outage timestamps
+      Hash chain makes the gap explicitly visible — not hidden
+```
+
+The gap record is not a failure — it is evidence of correct behavior. Auditors can see exactly when the Audit Store was unavailable and that no records were lost (all arrived after recovery).
+
+### 7.5 System Policies — Audit Provenance Gaps
+
+| Policy | Rule |
+|--------|------|
+| `STO-004` | The Audit Store is a specialized Storage Provider sub-type — append-only, hash chain integrity, reference-based retention, compliance-grade queries. Event Stream is the delivery channel only. (See doc 11) |
+| `AUD-018` | Audit records are replicated using live sync (Regional DCMs) or signed bundle export (Sovereign DCMs). Sovereignty checks required before any replication. Hash chain integrity preserved across transport. Fully isolated Sovereign DCMs maintain local-only audit stores with manual export. |
+| `OBS-002` | DCM ships a default Grafana-based observability dashboard for minimal/dev/standard profiles. Standard+ profiles may substitute enterprise platforms. FSI requires enterprise observability. Sovereign DCMs use local dashboard only with no external connections. |
+| `AUD-019` | Storage Provider failures are recorded via the Stage 1 Commit Log (etcd), which is independent of all Storage Providers. Audit Store self-failures produce pending_forward records. On recovery, a gap record (AUDIT_STORE_UNAVAILABLE) is inserted with the outage window timestamps. The hash chain gap is explicit and auditable. |
+
 
 ---
 
