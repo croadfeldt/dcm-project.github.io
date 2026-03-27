@@ -417,6 +417,27 @@ Providers are **custodians** of the underlying infrastructure — they are not t
 | Model | Description | Example |
 |-------|-------------|---------|
 | **Allocation** | Provider retains internal ownership. Consumer owns the Entity (the allocation). Provider has reclaim rights on decommission. | VM, Container, IP Address |
+| **Cost Analysis Information Provider** | Specialized Information Provider supplying cost estimates, placement cost signals, cost actuals, and budget alerts; DCM provides input data; provider performs calculations |
+| **Orchestrator** | DCM control plane component sequencing multi-step workflows; conducts request lifecycle pipeline; executes named workflow artifacts |
+| **Workflow (DCM)** | First-class versioned GitOps artifact defining named sequence of operations; included in Profiles; triggered manually/scheduled/event/policy |
+| **Provider Catalog Item** | What a specific Service Provider offers consumers: specific resource allocation or process with cost, availability, SLAs; linked to Resource Type Specification version |
+| **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
+| **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
+| **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Request Orchestrator** | DCM control plane event bus; routes lifecycle events to Policy Engine; coordinates pipeline via event-condition-action; does not contain hardcoded pipeline logic |
+| **Cost Analysis Component** | Internal DCM control plane component; three functions: pre-request estimation, placement input, ongoing attribution; not a billing system; not a provider type |
+| **Module** | DCM capability extension adding new functions; distinct from Profile (which configures behavior) |
+| **orchestration_flow** | Policy Group concern_type for static sequential flows; ordered: true; both static and dynamic flows compose through the same Policy Engine |
+| **payload_type** | Closed vocabulary of event types the Request Orchestrator publishes; policies pattern-match on payload type + state |
+| **OPA integration** | Reference implementation for Mode 3 Policy Providers; DCM payload as OPA input document; built-in Rego functions provided by DCM |
+| **Flow GUI** | Visual policy composer and orchestration manager; execution graph view, policy canvas, shadow mode dashboard, flow simulation |
+| **__platform__** | Immutable system Tenant owning DCM control plane resources; created at bootstrap before Policy Engine comes online |
+| **__transitional__** | Immutable system Tenant holding brownfield entities during INGEST phase |
+| **bootstrap manifest** | Signed manifest declaring initial system Tenants, bootstrap admin, and initial profile; hash-verified at every DCM startup |
+| **cross_tenant_authorization** | DCMGroup with this group_class formally grants one Tenant access to another's resources; has lifecycle (duration, renewal, revocation); revocation places active allocations in PENDING_REVIEW |
+| **drift_criticality** | Field-level property in Resource Type Spec (low/medium/high/critical); combined with change magnitude to produce drift severity |
+| **Ingress API** | Infrastructure-layer entry point for all inbound DCM requests; sets ingress block; routes to Consumer/Provider/Admin API surfaces |
+| **Provider Catalog Item** | Provider-specific instantiation of a Resource Type Specification; what consumers actually request; distinct from the Resource Type Specification itself |
 | **Recovery Policy** | Formal DCM policy type mapping trigger conditions (DISPATCH_TIMEOUT, PARTIAL_REALIZATION, etc.) to response actions; same authoring model as GateKeeper/Validation/Transformation |
 | **recovery_posture** | Fifth Policy Group concern_type governing failure and ambiguity response; binds a recovery profile group to the deployment |
 | **DRIFT_RECONCILE** | Recovery action: schedule discovery; let drift detection resolve actual state |
@@ -2469,7 +2490,28 @@ The Ship/Shore/Enclave terminology from defense IT contexts has been replaced th
 
 | Former Term | Replacement | Meaning |
 |-------------|-------------|---------|
-| Shore | **Recovery Policy** | Formal DCM policy type mapping trigger conditions (DISPATCH_TIMEOUT, PARTIAL_REALIZATION, etc.) to response actions; same authoring model as GateKeeper/Validation/Transformation |
+| Shore | **Cost Analysis Information Provider** | Specialized Information Provider supplying cost estimates, placement cost signals, cost actuals, and budget alerts; DCM provides input data; provider performs calculations |
+| **Orchestrator** | DCM control plane component sequencing multi-step workflows; conducts request lifecycle pipeline; executes named workflow artifacts |
+| **Workflow (DCM)** | First-class versioned GitOps artifact defining named sequence of operations; included in Profiles; triggered manually/scheduled/event/policy |
+| **Provider Catalog Item** | What a specific Service Provider offers consumers: specific resource allocation or process with cost, availability, SLAs; linked to Resource Type Specification version |
+| **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
+| **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
+| **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Request Orchestrator** | DCM control plane event bus; routes lifecycle events to Policy Engine; coordinates pipeline via event-condition-action; does not contain hardcoded pipeline logic |
+| **Cost Analysis Component** | Internal DCM control plane component; three functions: pre-request estimation, placement input, ongoing attribution; not a billing system; not a provider type |
+| **Module** | DCM capability extension adding new functions; distinct from Profile (which configures behavior) |
+| **orchestration_flow** | Policy Group concern_type for static sequential flows; ordered: true; both static and dynamic flows compose through the same Policy Engine |
+| **payload_type** | Closed vocabulary of event types the Request Orchestrator publishes; policies pattern-match on payload type + state |
+| **OPA integration** | Reference implementation for Mode 3 Policy Providers; DCM payload as OPA input document; built-in Rego functions provided by DCM |
+| **Flow GUI** | Visual policy composer and orchestration manager; execution graph view, policy canvas, shadow mode dashboard, flow simulation |
+| **__platform__** | Immutable system Tenant owning DCM control plane resources; created at bootstrap before Policy Engine comes online |
+| **__transitional__** | Immutable system Tenant holding brownfield entities during INGEST phase |
+| **bootstrap manifest** | Signed manifest declaring initial system Tenants, bootstrap admin, and initial profile; hash-verified at every DCM startup |
+| **cross_tenant_authorization** | DCMGroup with this group_class formally grants one Tenant access to another's resources; has lifecycle (duration, renewal, revocation); revocation places active allocations in PENDING_REVIEW |
+| **drift_criticality** | Field-level property in Resource Type Spec (low/medium/high/critical); combined with change magnitude to produce drift severity |
+| **Ingress API** | Infrastructure-layer entry point for all inbound DCM requests; sets ingress block; routes to Consumer/Provider/Admin API surfaces |
+| **Provider Catalog Item** | Provider-specific instantiation of a Resource Type Specification; what consumers actually request; distinct from the Resource Type Specification itself |
+| **Recovery Policy** | Formal DCM policy type mapping trigger conditions (DISPATCH_TIMEOUT, PARTIAL_REALIZATION, etc.) to response actions; same authoring model as GateKeeper/Validation/Transformation |
 | **recovery_posture** | Fifth Policy Group concern_type governing failure and ambiguity response; binds a recovery profile group to the deployment |
 | **DRIFT_RECONCILE** | Recovery action: schedule discovery; let drift detection resolve actual state |
 | **DISCARD_AND_REQUEUE** | Recovery action: best-effort cleanup; new request cycle created immediately |
@@ -3153,7 +3195,93 @@ OPS-010 through OPS-019. Key: cancellation always best-effort (OPS-011); recover
 
 ---
 
-## SECTION 50 — PERSONAS
+## SECTION 50 — GROUPS 3, 4, AND 5: FINAL ARCHITECTURE GAPS
+
+### 50.1 Cost Analysis — Information Provider Model (Group 3)
+
+Cost Analysis is an **Information Provider** — not a built-in DCM component. DCM does not calculate costs; it provides input data and consumes cost signals. Integration target: Red Hat Cost Management or any external cost management platform.
+
+**DCM provides to Cost Analysis:** entity lifecycle events (realized/suspended/decommissioned with billing_state), provider catalog item declared costs, provider capacity utilization, request payload previews for pre-request estimates.
+
+**Cost Analysis provides to DCM:** pre-request cost estimates (pulled by service catalog and CI pipeline), placement cost signals (pulled during placement Step 4), cost actuals (pushed after billing period), budget alerts (pushed when thresholds approached).
+
+**Fallback chain:** Cost Analysis provider → static declared cost (provider registration) → resource type default estimate → no estimate. Staleness thresholds govern fallback (PT24H standard; PT1H sovereign).
+
+CMP-001, CMP-002.
+
+### 50.2 The Orchestrator — Workflow Engine (Group 3)
+
+The **Orchestrator** sequences and executes multi-step DCM operations. Primary use case: the request lifecycle pipeline. General use case: any named workflow artifact.
+
+**Workflows are first-class DCM artifacts** — versioned, GitOps-managed, same lifecycle as all other artifacts. Workflows can be triggered: manually, scheduled (cron), event-triggered, or by policy output. Profiles include workflow bindings — activating `fsi` profile automatically activates compliance, drift remediation, sovereignty verification, and audit verification workflows.
+
+**Step types:** discovery_trigger, policy_evaluation, policy_evaluation_batch, notification_trigger, provider_dispatch, wait_for_event, wait_for_condition, report_generation, entity_state_transition, sub_workflow, parallel, human_approval, cost_analysis_query, data_transform.
+
+**Request lifecycle pipeline is a built-in system workflow** — cannot be deactivated; can be extended via Policy Groups.
+
+**Workflow execution records** have UUID, state machine, step results, and full audit trail. CMP-003, CMP-004, CMP-005.
+
+### 50.3 Ingress API vs Consumer API (Group 5 fix)
+
+The **Ingress API** is the network infrastructure layer (API Gateway) — TLS termination, auth validation, rate limiting, ingress block population, routing. It routes to three logical API surfaces on distinct path prefixes:
+- `/api/v1/` → **Consumer API** (catalog, requests, resource management, audit)
+- `/api/v1/provider/` → **Provider API** (callbacks, update notifications, cancellation)
+- `/api/v1/admin/` → **Admin API** (discovery triggers, orphan review, tenant management)
+
+The Ingress API is not a separate service — it is the API Gateway component. CMP-007.
+
+### 50.4 Consumer Rate Limiting and Quota Model (Group 5 fix)
+
+**Request rate quotas** — enforced at Ingress API level per actor; returns 429 with Retry-After. Configured in platform-domain layer.
+
+**Resource quotas** — enforced by GateKeeper policies at Step 5 (pre-placement). No hardcoded mechanism — quotas are declared policies. Quota exceeded → QUOTA_EXCEEDED GateKeeper rejection. Quota increase requests submitted via `Process.QuotaIncreaseRequest` catalog item → Orchestrator routes to platform admin for approval → GateKeeper policy updated.
+
+CMP-006.
+
+### 50.5 Drift Severity — Three-Tier Classification (Group 4 fix)
+
+**Tier 1 — Field criticality** (declared in Resource Type Spec): `drift_criticality: minor|significant|critical` per field.
+
+**Tier 2 — Magnitude thresholds** (system layer, overridable at platform/tenant): >50% change on significant field upgrades to critical; 10+ changed items upgrades minor to significant.
+
+**Tier 3 — Provider and consumer injection:** Providers suggest severity in update notifications (raise only). Consumers override sensitivity on specific entities (raise or lower — entity owner controls their resource's sensitivity).
+
+**Resolution:** highest severity from all three tiers wins.
+
+### 50.6 Cross-Tenant Authorization Lifecycle (Group 4 fix)
+
+`cross_tenant_authorization` is a DCMGroup with `group_class: cross_tenant_authorization`. Created by: granting Tenant admin (standard), Platform Admin (emergency), or pre-authorization policy (automated). Has declared duration or perpetual. On revocation: all active allocations/stakes under that authorization enter PENDING_REVIEW; notifications to both Tenant admins and affected resource owners; PT72H default resolution deadline; on_deadline_exceeded recovery policy fires. CTX-001 through CTX-004.
+
+### 50.7 Bootstrap Tenant Creation Sequence (Group 4 fix)
+
+Three foundation Tenants created during bootstrap (declared in bootstrap manifest, cannot be decommissioned):
+- `__platform__` — owns DCM's own control plane resources
+- `__transitional__` — holds brownfield entities during ingestion
+- `__system__` — owns system-level artifacts
+
+Bootstrap sequence: verify manifest → initialize storage → create foundation Tenants → create initial Platform Admin actor → activate system layers/policies/recovery profiles → register built-in providers → ready. RED-016.
+
+### 50.8 Catalog Item vs Resource Type Clarification (Group 5 fix)
+
+**Resource Type** — classification category; vendor-neutral; declares field schema expectations; groups catalog items for portability.
+
+**Resource Type Specification** — versioned formal definition in registry; providers implement against this.
+
+**Provider Catalog Item** — what a specific provider offers to consumers: specific options, cost, availability, SLAs, linked to a Resource Type Specification version. Can be a resource allocation OR a process (automation job, playbook, pipeline). *Consumers request by Resource Type; DCM resolves to a catalog item.*
+
+Anti-vocabulary: never say "catalog item" when you mean "resource type specification." Never say "resource type" when you mean a specific offering.
+
+### 50.9 BBQ-001 and Federation Routing Reconciliation (Group 5 fix)
+
+These operate at different scopes — complementary not conflicting:
+- **DCM-010 sovereignty pre-filter (Hub level):** Which Regional DCMs are eligible for this request?
+- **BBQ-001 check (Regional DCM level):** Is this Mode 4 Policy Provider endpoint within my sovereignty boundary?
+
+Hub selects Regional DCM using DCM-010. Regional DCM applies BBQ-001 for its own Mode 4 queries. Hub sovereignty pre-filter does NOT bypass Regional DCM's BBQ-001 check.
+
+---
+
+## SECTION 51 — PERSONAS
 
 | Persona | Primary Concern |
 |---------|----------------|
@@ -3170,7 +3298,7 @@ OPS-010 through OPS-019. Key: cancellation always best-effort (OPS-011); recover
 
 ---
 
-## SECTION 51 — TERMINOLOGY GLOSSARY
+## SECTION 52 — TERMINOLOGY GLOSSARY
 
 | Term | Definition |
 |------|-----------|
@@ -3233,6 +3361,27 @@ OPS-010 through OPS-019. Key: cancellation always best-effort (OPS-011); recover
 | **Raft** | Consensus protocol used by Commit Log (etcd) for quorum writes; guarantees durability even if minority of replicas fail |
 | **DCMGroup** | Universal group entity — all grouping constructs in DCM expressed as DCMGroup with group_class |
 | **group_class** | Determines system behavior of a DCMGroup — closed built-in set: tenant_boundary, resource_grouping, policy_collection, policy_profile, layer_grouping, composite, federation |
+| **Cost Analysis Information Provider** | Specialized Information Provider supplying cost estimates, placement cost signals, cost actuals, and budget alerts; DCM provides input data; provider performs calculations |
+| **Orchestrator** | DCM control plane component sequencing multi-step workflows; conducts request lifecycle pipeline; executes named workflow artifacts |
+| **Workflow (DCM)** | First-class versioned GitOps artifact defining named sequence of operations; included in Profiles; triggered manually/scheduled/event/policy |
+| **Provider Catalog Item** | What a specific Service Provider offers consumers: specific resource allocation or process with cost, availability, SLAs; linked to Resource Type Specification version |
+| **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
+| **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
+| **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Request Orchestrator** | DCM control plane event bus; routes lifecycle events to Policy Engine; coordinates pipeline via event-condition-action; does not contain hardcoded pipeline logic |
+| **Cost Analysis Component** | Internal DCM control plane component; three functions: pre-request estimation, placement input, ongoing attribution; not a billing system; not a provider type |
+| **Module** | DCM capability extension adding new functions; distinct from Profile (which configures behavior) |
+| **orchestration_flow** | Policy Group concern_type for static sequential flows; ordered: true; both static and dynamic flows compose through the same Policy Engine |
+| **payload_type** | Closed vocabulary of event types the Request Orchestrator publishes; policies pattern-match on payload type + state |
+| **OPA integration** | Reference implementation for Mode 3 Policy Providers; DCM payload as OPA input document; built-in Rego functions provided by DCM |
+| **Flow GUI** | Visual policy composer and orchestration manager; execution graph view, policy canvas, shadow mode dashboard, flow simulation |
+| **__platform__** | Immutable system Tenant owning DCM control plane resources; created at bootstrap before Policy Engine comes online |
+| **__transitional__** | Immutable system Tenant holding brownfield entities during INGEST phase |
+| **bootstrap manifest** | Signed manifest declaring initial system Tenants, bootstrap admin, and initial profile; hash-verified at every DCM startup |
+| **cross_tenant_authorization** | DCMGroup with this group_class formally grants one Tenant access to another's resources; has lifecycle (duration, renewal, revocation); revocation places active allocations in PENDING_REVIEW |
+| **drift_criticality** | Field-level property in Resource Type Spec (low/medium/high/critical); combined with change magnitude to produce drift severity |
+| **Ingress API** | Infrastructure-layer entry point for all inbound DCM requests; sets ingress block; routes to Consumer/Provider/Admin API surfaces |
+| **Provider Catalog Item** | Provider-specific instantiation of a Resource Type Specification; what consumers actually request; distinct from the Resource Type Specification itself |
 | **Recovery Policy** | Formal DCM policy type mapping trigger conditions (DISPATCH_TIMEOUT, PARTIAL_REALIZATION, etc.) to response actions; same authoring model as GateKeeper/Validation/Transformation |
 | **recovery_posture** | Fifth Policy Group concern_type governing failure and ambiguity response; binds a recovery profile group to the deployment |
 | **DRIFT_RECONCILE** | Recovery action: schedule discovery; let drift detection resolve actual state |
@@ -3434,7 +3583,7 @@ OPS-010 through OPS-019. Key: cancellation always best-effort (OPS-011); recover
 
 ---
 
-## SECTION 52 — OPEN QUESTIONS
+## SECTION 53 — OPEN QUESTIONS
 
 These items are explicitly unresolved. Do not make assumptions about them — flag them and ask for guidance.
 
@@ -3531,7 +3680,7 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
-## SECTION 53 — DOCUMENTATION STRUCTURE
+## SECTION 54 — DOCUMENTATION STRUCTURE
 
 DCM documentation follows a hierarchical structure:
 
@@ -3579,7 +3728,7 @@ content/
 
 ---
 
-## SECTION 54 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 55 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, follow these instructions:
 

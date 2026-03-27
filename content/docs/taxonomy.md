@@ -174,6 +174,15 @@ A data layer contributed by a Service Provider containing service-specific confi
 
 ### Operational Terms
 
+**Cost Analysis Information Provider**
+The specialized Information Provider that supplies cost estimation, placement cost signals, cost actuals, and budget alerts to DCM. DCM does not perform cost calculations — it provides input data and consumes signals from this provider. Integrates with external cost management platforms (e.g., Red Hat Cost Management). Falls back to static declared costs from provider registration when unavailable.
+
+**Orchestrator**
+The DCM control plane component that sequences and executes ordered workflows. Conducts the request lifecycle pipeline and executes named workflow artifacts. Relies heavily on policies (workflow steps invoke Policy Engine) and data (workflow steps read/write entity state). Workflows are first-class DCM artifacts included in Profiles.
+
+**Workflow (DCM)**
+A versioned, GitOps-managed DCM artifact defining a named sequence of operations. Can be triggered manually, on a schedule, by events, or by policy output. Included in Profiles to automatically activate functionality when the profile is applied. The request lifecycle pipeline is itself a system-domain built-in workflow.
+
 **Brownfield**
 Existing infrastructure provisioned outside of DCM, brought under management via the Ingestion Model.
 
@@ -228,6 +237,8 @@ Terms to avoid and what to use instead.
 | **Producer** | Generic term not in DCM vocabulary | **Service Provider** — carries the full DCM contract model |
 | **Shore / Ship / Enclave** | Defense IT terminology — not universally understood | **Hub DCM**, **Regional DCM**, **Sovereign DCM** |
 | **User** (generic) | Means different things at different layers | **Developer** / **Application Owner** (Application domain); **Platform Engineer** / **SRE** (platform) |
+| **"catalog item"** used to mean "resource type specification" | These are distinct: resource type specification = vendor-neutral contract in registry; catalog item = provider's specific offering implementing that contract | **Provider Catalog Item** or **Resource Type Specification** — be specific |
+| **"resource type"** used to mean a specific provider offering | Resource type is the classification; the offering is the catalog item | **Provider Catalog Item** |
 | **Service** (unqualified) | Overloaded — means different things at each layer | **Catalog Item** (Application), **Resource Type** (Control Plane), **Service Provider** (provider) |
 | **Config / Configuration** | Could mean Layer, Resource Type Spec, Policy, or settings | Specify: **Layer**, **Resource Type Specification**, **Policy**, **Platform configuration** |
 | **Manage** | Means everything and nothing | **Provision**, **configure**, **monitor**, **decommission**, **migrate**, **govern** |

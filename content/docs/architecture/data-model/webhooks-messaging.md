@@ -148,6 +148,85 @@ policy: "If ingress.surface == message_bus_inbound AND ingress.actor.type != web
 policy: "If ingress.surface == message_bus_inbound AND message_bus_provider.jurisdiction != tenant.sovereignty_zone THEN gatekeep"
 ```
 
+
+### 2.5 Ingress API vs Consumer API — Relationship Clarification
+
+These two terms refer to different architectural layers:
+
+**Ingress API (infrastructure layer):**
+The network-level entry point for all inbound requests to the DCM control plane. It handles:
+- TLS termination
+- Authentication token validation
+- Setting the immutable `ingress` block on every request (surface, actor, timestamp, mfa_verified)
+- Rate limiting at the network level
+- Routing to the appropriate internal component (Consumer API handlers, Provider API handlers, Admin API handlers)
+
+The Ingress API is infrastructure — it is not directly defined in any consumer-facing specification.
+
+**Consumer API (application layer):**
+The logical REST API surface that consumers interact with, as defined in the [Consumer API Specification](../specifications/consumer-api-spec.md). The Consumer API is *served through* the Ingress API. When a consumer calls `POST /api/v1/requests`, that request enters through the Ingress API (which sets the ingress block) and is then handled by the Consumer API component.
+
+**Other APIs served through the Ingress API:**
+- **Provider API** — the callback and notification endpoints that Service Providers call (`/api/v1/provider/...`)
+- **Admin API** — platform administration operations (`/api/v1/admin/...`)
+- **Webhook Inbound** — external systems calling DCM (`/api/v1/webhooks/...`)
+
+**The Ingress API is one, the Consumer API is one of several logical surfaces routed through it.**
+
+---
+
+### 2.6 Consumer Rate Limiting and Quota Model
+
+Consumer-side rate limiting and resource quotas are enforced by GateKeeper policies — not hardcoded limits. This keeps quota enforcement consistent with DCM's policy-driven model.
+
+**Request rate limiting (per actor):**
+
+```yaml
+rate_limit_policy:
+  type: gatekeeper
+  handle: "system/quotas/api-rate-limit"
+  trigger: request.initiated
+  conditions:
+    - field: ingress.actor_uuid
+      rate_window: PT1M
+      max_requests: 60           # configurable per Tenant policy
+  action: reject
+  rejection_code: 429
+  rejection_message: "Rate limit exceeded. Retry after PT1M."
+```
+
+**Resource quotas (per Tenant per resource type):**
+
+```yaml
+quota_policy:
+  type: gatekeeper
+  handle: "tenant/payments/vm-quota"
+  trigger: request.initiated
+  conditions:
+    - field: request.resource_type
+      equals: Compute.VirtualMachine
+    - field: tenant.active_entity_count
+      resource_type: Compute.VirtualMachine
+      operator: gte
+      value: 100                 # max 100 concurrent VMs for this Tenant
+  action: reject
+  rejection_message: "VM quota exceeded (100). Request a quota increase via the Admin API."
+```
+
+**Quota increase process:** Tenants request quota increases through the standard request process. A quota change request produces a Requested State record, goes through policy evaluation, and requires Platform Admin approval for significant increases.
+
+**Profile-governed defaults:**
+
+| Profile | Default API rate limit | Default resource quota |
+|---------|----------------------|----------------------|
+| minimal | 10 req/min | Unlimited |
+| dev | 60 req/min | Unlimited |
+| standard | 60 req/min | Policy-declared |
+| prod | 120 req/min | Policy-declared |
+| fsi | 60 req/min | Strict policy-declared |
+| sovereign | 30 req/min | Strict policy-declared |
+
+
 ### 2.4 System Policies
 
 | Policy | Rule |

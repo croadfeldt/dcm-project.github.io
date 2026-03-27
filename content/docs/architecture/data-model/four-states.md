@@ -491,6 +491,123 @@ Policy Engine evaluates drift
 Audit Store records drift event with full provenance
 ```
 
+
+### 6.3 Drift Severity Classification
+
+Drift severity is determined by combining three independent tiers. The final severity is the highest tier that applies.
+
+**Tier 1 — Field criticality (declared in Resource Type Specification):**
+
+```yaml
+resource_type_spec:
+  fields:
+    display_name:
+      drift_criticality: minor      # non-functional change
+    cpu_count:
+      drift_criticality: significant
+    memory_gb:
+      drift_criticality: significant
+    security_group_ids:
+      drift_criticality: critical   # security-relevant change
+    firewall_rules:
+      drift_criticality: critical
+```
+
+**Tier 2 — Profile/layer magnitude thresholds:**
+
+```yaml
+# system/drift/severity-thresholds layer (overridable at platform/tenant domain)
+drift_severity_thresholds:
+  significant_field_magnitude_upgrade:
+    percentage_change_threshold: 50    # >50% change upgrades significant → critical
+  minor_field_magnitude_upgrade:
+    item_count_threshold: 10           # 10+ changed items upgrades minor → significant
+```
+
+**Tier 3 — Provider and consumer injection:**
+
+Providers may suggest severity in update notifications (raise only):
+```yaml
+provider_drift_hint:
+  field: memory_gb
+  suggested_severity: critical
+  reason: "Memory decrease on running workload risks OOM"
+```
+
+Consumers may override sensitivity on specific entities (raise or lower):
+```yaml
+entity:
+  drift_sensitivity_overrides:
+    - field: cpu_count
+      override_criticality: critical
+      reason: "Production payments workload — any CPU change is critical"
+```
+
+**Resolution rule:** The Drift Detection component takes the highest severity from all three tiers. Provider injection can raise but not lower the Tier 1/2 result. Consumer injection can raise or lower (entity owner controls their own resource's sensitivity). Profile governs whether consumer lowering is permitted.
+
+
+
+### 6.3 Drift Severity Classification
+
+Drift severity is determined by two independent dimensions declared in the Resource Type Specification — field criticality and change magnitude. The combination produces a deterministic severity classification for any drift event.
+
+#### Field Criticality (declared per field in Resource Type Spec)
+
+```yaml
+resource_type_spec:
+  fqn: Compute.VirtualMachine
+  fields:
+    display_name:
+      drift_criticality: low          # cosmetic; never affects function
+    cpu_count:
+      drift_criticality: medium       # affects performance; not security
+    memory_gb:
+      drift_criticality: medium
+    security_group_ids:
+      drift_criticality: critical     # security boundary field; always critical
+    os_image:
+      drift_criticality: critical     # security posture; always critical
+    storage_gb:
+      drift_criticality: medium
+    network_interface_ids:
+      drift_criticality: high         # connectivity; significant operational impact
+```
+
+**Criticality levels:** `low | medium | high | critical`
+
+#### Change Magnitude (profile-governed thresholds)
+
+```yaml
+drift_magnitude_thresholds:
+  profile_defaults:
+    standard:
+      minor:       change_pct < 10%
+      significant: change_pct 10-50%
+      critical:    change_pct > 50% OR value_disappeared OR type_changed
+    prod:
+      minor:       change_pct < 5%
+      significant: change_pct 5-25%
+      critical:    change_pct > 25% OR value_disappeared OR type_changed
+```
+
+#### Severity Matrix
+
+| Field Criticality | Change Magnitude | Drift Severity |
+|------------------|-----------------|----------------|
+| low | any | minor |
+| medium | minor | minor |
+| medium | significant | significant |
+| medium | critical | significant |
+| high | minor | significant |
+| high | significant | significant |
+| high | critical | critical |
+| critical | any | critical |
+
+**Unsanctioned changes** (no corresponding Requested State record) are always elevated one severity level above what the matrix produces. A `significant` unsanctioned change becomes `critical`.
+
+**Multi-field drift:** when multiple fields drift simultaneously, the overall severity is the highest severity among all drifted fields.
+
+
 ### 6.2 Unsanctioned Changes
 
 A specific category of drift — a change made directly to a resource without a corresponding DCM request. Detected by:

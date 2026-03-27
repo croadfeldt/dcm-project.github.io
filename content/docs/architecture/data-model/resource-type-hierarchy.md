@@ -1,7 +1,7 @@
 ---
 title: "Resource Type Hierarchy and Service Catalog"
 type: docs
-weight: 4
+weight: 5
 ---
 
 > **⚠️ Active Development Notice**
@@ -29,9 +29,53 @@ The hierarchy serves four goals:
 
 ---
 
+
+### 1a. Precise Vocabulary — Resource Type vs Catalog Item
+
+These terms are frequently conflated. The distinction is architectural:
+
+**Resource Type** — the classification category. Groups catalog items for portability and discovery. Vendor-neutral by requirement. Defines the field schema that any provider offering this type must support. Examples: `Compute.VirtualMachine`, `Network.IPAddress`, `Process.AnsiblePlaybook`.
+
+**Resource Type Specification** — the versioned, formal definition of a Resource Type: field schema, constraints, lifecycle rules, portability classification, and allowed relationship types. Stored in the Resource Type Registry. Providers implement against a specific version. Example: `Compute.VirtualMachine v2.1.0`.
+
+**Provider Catalog Item** — what a specific Service Provider is offering to consumers. The provider's declaration: "I can fulfill `Compute.VirtualMachine v2.1.0` with these specific options, at this cost, with these availability characteristics, in this region." A catalog item is always linked to a specific Resource Type Specification version. Catalog items can represent resource allocations (a VM, a subnet) or processes (an automation job, a playbook execution, a pipeline run) — anything a provider offers for consumption.
+
+**The key relationship:** Consumers request by Resource Type (or Resource Type Specification version). DCM resolves to a Provider Catalog Item through the specificity narrowing algorithm. The catalog item is what actually gets provisioned. The resource type is the portable, vendor-neutral expression of intent.
+
+**Anti-vocabulary update:** Never say "catalog item" when you mean "resource type specification." Never say "resource type" when you mean a specific provider offering — use "catalog item" or "provider catalog item."
+
+
 ## 2. The DCM Resource Type Registry
 
 DCM maintains an official **Resource Type Registry** — the authoritative source of standard resource type definitions. The registry is the foundation of portability across the DCM ecosystem.
+
+
+### 2.1a Catalog Item vs Resource Type Specification — Critical Distinction
+
+These two terms are frequently conflated throughout the documentation. They are distinct concepts at different levels of the hierarchy:
+
+**Resource Type Specification (Registry entry):**
+- Vendor-neutral definition of a resource type's fields, constraints, lifecycle rules, and portability classification
+- Lives in the Resource Type Registry (Tier 1, 2, or 3)
+- Examples: `Compute.VirtualMachine v2.1.0`, `Network.VLAN v1.0.0`
+- Defines what the resource TYPE is, not what any specific provider offers
+
+**Provider Catalog Item (Service Catalog entry):**
+- A specific provider's offering implementing a Resource Type Specification
+- Includes provider-specific pricing, availability, SLAs, and performance characteristics
+- What consumers actually request via the Service Catalog
+- Examples: "EU-WEST-Prod-1's 4-CPU VM offering", "NetworkOps's VLAN service"
+- Tied to a specific provider; multiple providers can offer catalog items for the same Resource Type Spec
+
+**When to use each term:**
+- "The consumer requests a catalog item" ✓ — they request a provider's specific offering
+- "The resource type specification defines the field schema" ✓ — the spec defines structure
+- "The catalog item schema" ✗ — should be "the resource type specification schema"
+- "The consumer browses resource types" ✓ — they browse the type hierarchy
+- "The consumer selects a catalog item" ✓ — they select a specific provider offering
+
+**In the anti-vocabulary:** "Catalog Item" should not be used when "Resource Type Specification" is meant, and vice versa. The hierarchy is: Resource Type Category → Resource Type → Resource Type Specification → Provider Catalog Item.
+
 
 ### 2.1 Registry Principles
 

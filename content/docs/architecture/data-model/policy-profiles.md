@@ -47,6 +47,34 @@ Policy Providers   — external authoritative policy sources
 ## 2. Policy Groups
 ## 1a. Two-Dimensional Profile Model
 
+
+### 1a.0 Profile — One Posture, Multiple Compliance Domains
+
+**A DCM deployment runs exactly one Deployment Posture and zero or more Compliance Domain Groups simultaneously.** This is the complete profile model. No new concept is needed.
+
+```
+Active DCM Governance = one Deployment Posture + [zero or more Compliance Domains]
+
+Examples:
+  prod + hipaa                         ← healthcare production
+  prod + hipaa + gdpr                  ← EU healthcare production  
+  sovereign + fedramp-high + dod-il5   ← classified federal
+  standard                             ← general enterprise, no compliance overlay
+  dev + hipaa                          ← healthcare development (hipaa policies active,
+                                          but operational cost reduced by dev posture)
+```
+
+**Deployment Postures are mutually exclusive** — you cannot be both `prod` and `dev`. One posture governs the operational characteristics of the entire DCM deployment.
+
+**Compliance domains are additive** — HIPAA + FSI is valid and common. Each compliance domain group adds its own set of policies and constraints on top of the posture. They do not conflict with each other at the domain level (they govern different aspects of data handling); they may produce policy conflicts at the field level, which are resolved through the standard policy conflict resolution process.
+
+**The dev posture and compliance domains** — applying `dev` posture to a HIPAA-scoped deployment does not remove HIPAA obligations. It relaxes the *operational cost* of meeting them: less redundancy, shorter retention windows where permitted, advisory enforcement where HIPAA allows flexibility. The HIPAA compliance domain group remains active and its mandatory controls remain enforced.
+
+**Modules vs Profiles** — DCM uses both concepts with distinct meanings:
+- A **Profile** is a governance configuration: it declares how DCM behaves and what operational and compliance requirements apply.
+- A **Module** is a capability extension: it adds new functions to DCM (e.g., a HIPAA record validator, a custom resource type). Modules are not profiles and do not configure DCM behavior — they extend what DCM can do.
+
+
 ### 1a.1 The Gap in the Original Model
 
 The original six profiles (minimal → sovereign) are organized around **deployment posture** — how strict, how redundant, how governed. But organizations need compliance governance that is orthogonal to posture. A healthcare organization needs HIPAA controls regardless of whether they deploy at `standard` or `sovereign` posture. A payment processor needs PCI-DSS regardless of their redundancy profile.

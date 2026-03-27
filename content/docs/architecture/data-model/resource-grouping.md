@@ -1,7 +1,7 @@
 ---
 title: "Resource Grouping and Tenancy"
 type: docs
-weight: 7
+weight: 8
 ---
 
 > **⚠️ Active Development Notice**
@@ -295,6 +295,88 @@ custom_group_type_registration:
 - **Drift Detection** — can be scoped to a group
 - **Rehydration** — can target a group as the unit of reconstruction
 - **Field-Level Provenance** — group membership changes are recorded in entity provenance
+
+
+---
+
+## 10. Cross-Tenant Authorization Lifecycle
+
+Cross-tenant authorizations are the formal mechanism by which one Tenant grants another Tenant access to a shared resource or allocation. They are DCMGroup instances with `group_class: cross_tenant_authorization`.
+
+### 10.1 Creation
+
+Cross-tenant authorizations are created by:
+
+| Actor | Mechanism | When |
+|-------|-----------|------|
+| Granting Tenant Admin | Explicit manual grant via Admin API | Normal cross-tenant sharing setup |
+| Platform Admin | Emergency authorization | Operational incident; requires dual approval in fsi/sovereign |
+| Policy (pre-authorization) | GateKeeper policy auto-creates authorization | Pre-approved sharing patterns |
+
+```yaml
+cross_tenant_authorization:
+  artifact_metadata:
+    uuid: <uuid>
+    handle: "xta/networkops/appteam/vlan-100"
+    version: "1.0.0"
+    status: active
+  group_class: cross_tenant_authorization
+  granting_tenant_uuid: <networkops-tenant-uuid>
+  consuming_tenant_uuid: <appteam-tenant-uuid>
+  authorized_resource_types: [Network.VLAN, Network.IPAddressPool]
+  authorized_entity_uuids: [<vlan-100-uuid>]    # null = all resources of declared types
+  duration: P1Y                                   # null = perpetual until revoked
+  expires_at: <ISO 8601|null>
+  created_by: <actor-uuid>
+  created_at: <ISO 8601>
+  purpose: "AppTeam VMs require VLAN-100 attachment for production network access"
+```
+
+### 10.2 Duration and Renewal
+
+- **Fixed duration** (`duration: P1Y`): expires automatically. Notification sent P30D before expiry. Consuming Tenant must request renewal. If not renewed, enters EXPIRING state, then EXPIRED.
+- **Perpetual** (`duration: null`): active until explicitly revoked. No automatic expiry.
+- **Renewal**: consuming Tenant submits a new authorization request. Granting Tenant approves. New authorization created; old one superseded.
+
+### 10.3 Revocation
+
+```
+Granting Tenant admin revokes authorization
+  │
+  ▼ Authorization status → REVOKED
+  │
+  ▼ Identify active allocations and stakes under this authorization
+  │   All cross-tenant allocations/stakes enter PENDING_REVIEW
+  │
+  ▼ Notifications sent to:
+  │   Consuming Tenant Admin (action required: migrate or release)
+  │   Affected resource owners in consuming Tenant
+  │   Platform Admin (informational)
+  │
+  ▼ Resolution deadline: P30D (configurable; P7D for fsi/sovereign)
+  │
+  ├── Consuming Tenant releases stakes/allocations → authorization closes cleanly
+  └── Deadline exceeded → Platform Admin escalation
+      Policy may declare automatic release on deadline exceeded
+```
+
+### 10.4 What Happens to Active Allocations on Revocation
+
+Resources already allocated under a now-revoked authorization are NOT immediately decommissioned — this would break production workloads. Instead:
+- The allocation/stake relationship enters PENDING_REVIEW
+- The authorization revocation is recorded as the `pending_review_trigger`
+- The consuming Tenant has a grace period to migrate or release
+- Automatic decommission on deadline exceeded is a policy declaration, not a default
+
+### 10.5 System Policies
+
+| Policy | Rule |
+|--------|------|
+| `XTA-001` | Cross-tenant authorizations require explicit creation by the granting Tenant admin, a platform admin, or a pre-authorization policy. They are never implicitly created. |
+| `XTA-002` | Fixed-duration authorizations generate a P30D expiry warning notification. Non-renewal results in EXPIRING then EXPIRED states. |
+| `XTA-003` | Authorization revocation places active allocations and stakes in PENDING_REVIEW with a policy-governed grace period. Resources are not automatically decommissioned on revocation. |
+| `XTA-004` | Automatic decommission of resources on authorization expiry or revocation requires explicit policy declaration. It is not the default behavior. |
+
 
 ---
 

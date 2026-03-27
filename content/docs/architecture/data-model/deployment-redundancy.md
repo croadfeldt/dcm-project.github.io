@@ -1,7 +1,7 @@
 ---
-title: "Deployment and Redundancy"
+title: "Deployment and Redundancy Model"
 type: docs
-weight: 16
+weight: 17
 ---
 
 > **⚠️ Active Development Notice**
@@ -586,6 +586,190 @@ DCM's own deployment is a DCM-managed resource subject to the same drift detecti
 | `RED-013` | Kubernetes is DCM's primary and recommended container runtime. Non-Kubernetes runtimes are supported for development and community extension purposes only. Production deployments must use Kubernetes. |
 | `RED-014` | Minimum hardware specifications are expressed as DCM Resource definitions per profile and enforced by the placement engine during DCM self-deployment. |
 | `RED-015` | DCM's own deployment is a DCM-managed resource subject to the same drift detection as any other resource. Bootstrap manifest hash verification (RED-011) provides independent verification. Audit Store hash chain breaks are detectable externally. |
+
+
+
+---
+
+## 9. Bootstrap Tenant Creation Sequence
+
+### 9.1 The Bootstrap Problem
+
+DCM requires every entity to belong to exactly one Tenant. But during initial deployment, no Tenants exist. The bootstrap sequence resolves this by creating the foundational Tenants as part of DCM startup, declared in the bootstrap manifest.
+
+### 9.2 The Three Foundation Tenants
+
+The bootstrap manifest declares three system Tenants that are created before any consumer can submit requests:
+
+```yaml
+bootstrap_tenants:
+  - handle: "__platform__"
+    display_name: "DCM Platform"
+    purpose: "Owns DCM's own control plane resources (components, stores, providers)"
+    automatically_created: true
+    cannot_be_decommissioned: true
+
+  - handle: "__transitional__"
+    display_name: "Transitional"
+    purpose: "Holds brownfield entities during ingestion before promotion to a real Tenant"
+    automatically_created: true
+    cannot_be_decommissioned: true
+
+  - handle: "__system__"
+    display_name: "System"
+    purpose: "Owns system-level artifacts (system layers, system policies, system workflows)"
+    automatically_created: true
+    cannot_be_decommissioned: true
+```
+
+### 9.3 Bootstrap Startup Sequence
+
+```
+DCM starts
+  │
+  ▼ Step 1: Verify bootstrap manifest hash and signature
+  │
+  ▼ Step 2: Initialize storage providers
+  │   GitOps stores initialized
+  │   Audit Store initialized
+  │   Commit Log initialized
+  │
+  ▼ Step 3: Create foundation Tenants (if not already existing)
+  │   __platform__, __transitional__, __system__
+  │
+  ▼ Step 4: Create initial Platform Admin actor
+  │   Declared in bootstrap manifest
+  │   Assigned to __platform__ Tenant
+  │   Given platform_admin role
+  │
+  ▼ Step 5: Activate system domain layers and policies
+  │   System layers loaded from GitOps store
+  │   System policies activated
+  │   Built-in recovery profiles activated
+  │
+  ▼ Step 6: Register built-in providers
+  │   Built-in Auth Provider
+  │   Search Index Storage Provider
+  │   Audit Store Storage Provider
+  │   (All owned by __platform__ Tenant)
+  │
+  ▼ Step 7: DCM ready
+      Consumer API, Provider API, Admin API accepting requests
+      Platform Admin can now create organization Tenants
+      Organization Tenants can request resources
+```
+
+### 9.4 System Policy
+
+| Policy | Rule |
+|--------|------|
+| `RED-016` | The three foundation Tenants (__platform__, __transitional__, __system__) are created during bootstrap and cannot be decommissioned. All DCM control plane resources are owned by __platform__. All brownfield ingested entities enter __transitional__ before promotion. |
+
+
+
+---
+
+## 9. Bootstrap Sequence and Initial Tenant Creation
+
+### 9.1 The Bootstrap Problem
+
+The DCM data model requires every entity to be owned by a Tenant. But Tenants are themselves DCM entities. The bootstrap sequence defines how the initial Tenants and platform admin actor are created before DCM can accept external requests.
+
+### 9.2 Bootstrap Manifest
+
+The bootstrap manifest (RED-011) declares the initial state required for DCM to start. It includes:
+
+```yaml
+bootstrap_manifest:
+  version: "1.0.0"
+  signed_by: <deploying-operator-key>
+
+  # Initial system Tenants (created before any external requests)
+  system_tenants:
+    - uuid: <platform-tenant-uuid>
+      handle: "__platform__"
+      display_name: "DCM Platform"
+      description: "System Tenant owning DCM's own control plane resources"
+      immutable: true             # cannot be decommissioned or modified by regular operators
+
+    - uuid: <transitional-tenant-uuid>
+      handle: "__transitional__"
+      display_name: "Transitional"
+      description: "Holding Tenant for brownfield ingestion (INGEST phase)"
+      immutable: true
+
+  # Initial platform admin actor
+  bootstrap_admin:
+    uuid: <admin-actor-uuid>
+    username: "dcm-bootstrap-admin"
+    auth_provider: builtin
+    roles: [platform_admin]
+    credential_ref: <bootstrap-admin-credential-ref>
+    # This credential is rotated on first login
+
+  # Active profile for initial deployment
+  initial_profile:
+    deployment_posture: minimal    # or as declared; can be changed post-bootstrap
+    compliance_domains: []
+
+  # Bootstrap admin's initial Tenant
+  initial_tenant:
+    uuid: <org-tenant-uuid>
+    handle: "org-default"
+    display_name: "Default Organization Tenant"
+    owned_by: bootstrap_admin
+```
+
+### 9.3 Bootstrap Sequence
+
+```
+DCM starts → bootstrap manifest hash verified (RED-011)
+  │
+  ▼ System Tenants created (before Policy Engine active):
+  │   __platform__ Tenant — owns DCM control plane resources
+  │   __transitional__ Tenant — brownfield ingestion holding
+  │   These are created by the bootstrap process itself, not through the request pipeline
+  │
+  ▼ Bootstrap admin actor created
+  │   Auth Provider initialized with bootstrap credential
+  │   Platform Admin role assigned
+  │
+  ▼ Initial profile activated
+  │   Deployment posture policies loaded
+  │   Compliance domain policies loaded (if declared)
+  │
+  ▼ Policy Engine comes online
+  │   All subsequent operations go through the standard request pipeline
+  │
+  ▼ Bootstrap admin creates the initial organization Tenant (optional)
+  │   First real request through the pipeline
+  │   Creates the initial production Tenant for organizational resources
+  │
+  ▼ Bootstrap admin credential rotation notification sent
+  │   Bootstrap credential must be rotated on first login
+  │   After rotation, bootstrap_admin becomes a standard platform admin actor
+  │
+  ▼ DCM accepts external requests
+```
+
+### 9.4 System Tenants
+
+The `__platform__` and `__transitional__` Tenants are created by the bootstrap process and are immutable:
+
+| System Tenant | Purpose | Who can modify |
+|--------------|---------|---------------|
+| `__platform__` | Owns DCM's own control plane resources | Platform Admin (restricted operations only) |
+| `__transitional__` | Brownfield ingestion holding area | Ingestion pipeline only |
+
+These Tenants are exempt from the normal Tenant decommission workflow — they cannot be decommissioned while DCM is operational.
+
+### 9.5 System Policy
+
+| Policy | Rule |
+|--------|------|
+| `BOOT-001` | The __platform__ and __transitional__ system Tenants are created by the bootstrap process before the Policy Engine comes online. They are immutable and cannot be decommissioned while DCM is running. |
+| `BOOT-002` | The bootstrap admin credential must be rotated on first login. The bootstrap manifest declares the initial credential reference only; the credential itself is managed by the Credential Provider. |
+| `BOOT-003` | After bootstrap, all Tenant creation and modification goes through the standard request pipeline. The bootstrap process is a one-time operation. |
 
 
 ---

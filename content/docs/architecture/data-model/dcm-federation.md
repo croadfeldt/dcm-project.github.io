@@ -1,7 +1,7 @@
 ---
 title: "DCM Federation and Cross-Instance Coordination"
 type: docs
-weight: 21
+weight: 22
 ---
 
 > **⚠️ Active Development Notice**

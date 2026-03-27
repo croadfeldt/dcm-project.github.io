@@ -1,7 +1,7 @@
 ---
 title: "Universal Group Model"
 type: docs
-weight: 14
+weight: 15
 ---
 
 > **⚠️ Active Development Notice**
@@ -582,6 +582,90 @@ dcm_group:
 - **Entity Relationships** (doc 09) — cross-tenant authorized relationships between groups
 - **Universal Audit Model** (doc 16) — all group changes produce audit records
 - **Ingestion Model** (doc 13) — migration of existing constructs to universal groups
+
+
+---
+
+## 13. Cross-Tenant Authorization Lifecycle
+
+### 13.1 What Cross-Tenant Authorizations Are
+
+A `cross_tenant_authorization` is a DCMGroup with `group_class: cross_tenant_authorization`. It is the formal mechanism by which one Tenant grants another Tenant permission to reference, allocate from, or stake a resource that belongs to the granting Tenant.
+
+Without a cross-tenant authorization, entities in different Tenants cannot form relationships. The authorization is the bridge that enables cross-Tenant resource sharing while maintaining isolation.
+
+### 13.2 Authorization Lifecycle
+
+```yaml
+cross_tenant_authorization:
+  artifact_metadata:
+    uuid: <uuid>
+    handle: "org/cross-tenant-auth/networkops-to-appteam-vlan100"
+    version: "1.0.0"
+    status: active
+
+  granting_tenant_uuid: <networkops-tenant-uuid>
+  receiving_tenant_uuid: <appteam-tenant-uuid>
+  authorized_resources:
+    - resource_uuid: <vlan-100-uuid>
+      permitted_operations: [stake, read]
+    - resource_type: Network.IPAddress
+      source_pool_uuid: <ippool-uuid>
+      permitted_operations: [allocate]
+
+  # Duration
+  valid_from: <ISO 8601>
+  valid_until: <ISO 8601|null>       # null = perpetual until revoked
+  auto_renew: false
+
+  # Who created this
+  granted_by_actor_uuid: <uuid>
+  granted_at: <ISO 8601>
+```
+
+### 13.3 Who Creates Cross-Tenant Authorizations
+
+| Creator | Scenario | Authorization type |
+|---------|---------|-------------------|
+| Granting Tenant Admin | Standard: NetworkOps authorizes AppTeam to use VLAN-100 | explicit |
+| Platform Admin | Emergency or platform-managed shared infrastructure | platform_managed |
+| Pre-authorization policy | Policy automatically authorizes based on conditions | policy_auto |
+
+### 13.4 Revocation and Its Consequences
+
+When a cross-tenant authorization is revoked:
+
+```
+Authorization revoked (by granting Tenant admin, platform admin, or expiry)
+  │
+  ▼ All active allocations and stakes under this authorization are identified
+  │
+  ▼ For each active allocation / stake:
+  │   Entity enters PENDING_REVIEW state
+  │   pending_review_record created:
+  │     trigger: cross_tenant_auth.revoked
+  │     resolution_options: [re_authorize, release, migrate, escalate]
+  │
+  ▼ Notifications sent:
+  │   Granting Tenant Admin
+  │   Receiving Tenant Admin
+  │   Each affected resource owner
+  │   Platform Admin (if platform_managed authorization)
+  │
+  ▼ Resolution deadline: PT72H (configurable per profile)
+  │
+  └── On deadline: on_deadline_exceeded recovery policy fires
+```
+
+### 13.5 System Policies — Cross-Tenant Authorization
+
+| Policy | Rule |
+|--------|------|
+| `CTX-001` | Cross-tenant relationships require an active cross-tenant authorization or a resource type declared publicly_stakeable / publicly_allocatable in its Resource Type Spec. |
+| `CTX-002` | Cross-tenant authorization revocation places all active dependent entities in PENDING_REVIEW. Revocation does not immediately release allocations. |
+| `CTX-003` | Cross-tenant authorization expiry is treated identically to explicit revocation. |
+| `CTX-004` | Platform Admin may create cross-tenant authorizations on behalf of any Tenant. All platform-managed authorizations carry a platform_managed flag and are visible in the platform admin audit log. |
+
 
 ---
 
