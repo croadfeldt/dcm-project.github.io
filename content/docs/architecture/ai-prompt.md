@@ -424,6 +424,16 @@ Providers are **custodians** of the underlying infrastructure — they are not t
 | **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
 | **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
 | **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Unified Governance Matrix** | Single enforcement point for all cross-boundary decisions; four axes (subject/data/target/context); hard vs soft enforcement; field-level granularity (allowlist/blocklist/paths); profile-bound defaults; GMX-001–010 |
+| **governance_matrix_rule** | Artifact declaring match conditions across four axes and a decision (ALLOW/DENY/ALLOW_WITH_CONDITIONS/STRIP_FIELD/REDACT/AUDIT_ONLY) with hard or soft enforcement |
+| **sovereignty_zone** | Registered DCM artifact declaring geopolitical/regulatory boundary; rules reference zones by ID; inter-zone agreements declared explicitly |
+| **STRIP_FIELD** | Governance matrix decision: remove named fields from payload and proceed; if stripped field is required → DENY_REQUEST |
+| **REDACT** | Governance matrix decision: replace field value with `<REDACTED>`; field presence preserved; receiver knows field exists but not its value |
+| **Provider Type Registry** | Three-tier registry of approved provider types; each entry declares permissions, default_approval_method, enabled_in_profiles, capability_schema_ref |
+| **registration_token** | Pre-issued by platform admin; scoped to provider_type/handle_pattern/zone; single_use; grants_auto_approval flag; value presented once only |
+| **approval_method** | Registration approval: auto | human_review | dual_approval | committee; resolved as most_restrictive(provider_type_default, profile_min, token_effect) |
+| **Drift Reconciliation Component** | Control plane component; compares Discovered vs Realized State; produces drift records and events; never writes to Realized Store; DRC-001–005 |
+| **drift_record** | Artifact produced by Drift Reconciliation; field-by-field comparison result with severity classification; unsanctioned flag; status tracking through resolution |
 | **Placement Engine** | Six-step algorithm: sovereignty filter → accreditation filter → capability filter → reserve query → tie-breaking (policy/priority/affinity/cost/load/hash) → confirm; PLC-001–006 |
 | **reserve_query** | Parallel capacity queries to all eligible provider candidates; PT5M capacity hold; non-responders and insufficient-capacity providers excluded |
 | **consistent hash** | Final placement tie-breaker: SHA-256(request_uuid+resource_type+sorted_candidates); deterministic; never round-robin |
@@ -2515,6 +2525,16 @@ The Ship/Shore/Enclave terminology from defense IT contexts has been replaced th
 | **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
 | **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
 | **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Unified Governance Matrix** | Single enforcement point for all cross-boundary decisions; four axes (subject/data/target/context); hard vs soft enforcement; field-level granularity (allowlist/blocklist/paths); profile-bound defaults; GMX-001–010 |
+| **governance_matrix_rule** | Artifact declaring match conditions across four axes and a decision (ALLOW/DENY/ALLOW_WITH_CONDITIONS/STRIP_FIELD/REDACT/AUDIT_ONLY) with hard or soft enforcement |
+| **sovereignty_zone** | Registered DCM artifact declaring geopolitical/regulatory boundary; rules reference zones by ID; inter-zone agreements declared explicitly |
+| **STRIP_FIELD** | Governance matrix decision: remove named fields from payload and proceed; if stripped field is required → DENY_REQUEST |
+| **REDACT** | Governance matrix decision: replace field value with `<REDACTED>`; field presence preserved; receiver knows field exists but not its value |
+| **Provider Type Registry** | Three-tier registry of approved provider types; each entry declares permissions, default_approval_method, enabled_in_profiles, capability_schema_ref |
+| **registration_token** | Pre-issued by platform admin; scoped to provider_type/handle_pattern/zone; single_use; grants_auto_approval flag; value presented once only |
+| **approval_method** | Registration approval: auto | human_review | dual_approval | committee; resolved as most_restrictive(provider_type_default, profile_min, token_effect) |
+| **Drift Reconciliation Component** | Control plane component; compares Discovered vs Realized State; produces drift records and events; never writes to Realized Store; DRC-001–005 |
+| **drift_record** | Artifact produced by Drift Reconciliation; field-by-field comparison result with severity classification; unsanctioned flag; status tracking through resolution |
 | **Placement Engine** | Six-step algorithm: sovereignty filter → accreditation filter → capability filter → reserve query → tie-breaking (policy/priority/affinity/cost/load/hash) → confirm; PLC-001–006 |
 | **reserve_query** | Parallel capacity queries to all eligible provider candidates; PT5M capacity hold; non-responders and insufficient-capacity providers excluded |
 | **consistent hash** | Final placement tie-breaker: SHA-256(request_uuid+resource_type+sorted_candidates); deterministic; never round-robin |
@@ -3410,7 +3430,69 @@ ZT-001 through ZT-005 (zero trust) + ACC-001 through ACC-006 (accreditation). Ke
 
 ---
 
-## SECTION 53 — TERMINOLOGY GLOSSARY
+## SECTION 53 — GOVERNANCE MATRIX, REGISTRATION, AND DRIFT RECONCILIATION
+
+### 53.1 Unified Governance Matrix (doc 27)
+
+The **single enforcement point** for all cross-boundary data and capability decisions in DCM. Supersedes the Data/Capability Authorization Matrix in doc 26 Section 4. Evaluates every interaction using four axes:
+
+**Axis 1 — Subject (who):** actor | service_provider | dcm_peer | policy_provider | storage_provider | notification_provider | information_provider | system. With identity (specific UUID or trust_posture or accreditation_level) and tenant scope.
+
+**Axis 2 — Data (what):** classification (exact/in/minimum/maximum), resource_type, field_paths (allowlist/blocklist/any with dot-notation paths including wildcards `fields.phi_*`), capability (read/write/store/replicate/export/notify/execute/discover/query/federate).
+
+**Axis 3 — Target (where):** type, specific provider/peer UUID, sovereignty_zone (match/not_in), jurisdiction (includes/excludes/intersects country codes), trust_posture (minimum), accreditation_held (includes/not_includes).
+
+**Axis 4 — Context (under what conditions):** profile (posture/compliance_domains), zero_trust_posture (minimum level), tls_mutual, hardware_attestation, federated, cross_jurisdiction, cross_tenant.
+
+**Decisions:** ALLOW | DENY | ALLOW_WITH_CONDITIONS | STRIP_FIELD | REDACT | AUDIT_ONLY
+
+**Hard vs soft enforcement:** Hard rules cannot be relaxed by any downstream rule — ever. GMX-004: sovereign/classified data DENY to all external targets is always hard regardless of profile. Soft rules can be tightened by more-specific domain rules.
+
+**Field-level granularity:** allowlist mode (only named fields cross boundary), blocklist mode (named fields stripped/redacted), passthrough. STRIP_FIELD removes field; REDACT replaces value with `<REDACTED>`; if stripped field is required → escalates to DENY_REQUEST (GMX-010).
+
+**Profile-bound defaults:** minimal (pass public/internal; hard DENY sovereign/classified), dev (add confidential with TLS), standard (restricted requires third_party accreditation; PHI denied by default), prod (verified peers only for confidential+; notification fields stripped for restricted), fsi (cross-jurisdiction hard DENY for regulated data; PHI requires BAA+verified+full-ZT), sovereign (no sensitive data in federation; hardware attestation required for all federation).
+
+**Compliance domain rules:** Automatically added when domain active. HIPAA: minimum_necessary principle; PHI audit all interactions; no export without regulatory cert. GDPR: EU residency hard rule; personal identifier fields stripped outside EU zones.
+
+**Sovereignty zones:** Registered artifacts declaring jurisdictions, regulatory frameworks, inter-zone agreements, and required provider accreditation. Rules reference zones by ID, not raw country codes.
+
+**Evaluation algorithm:** Hard DENY first → any hard DENY = terminal DENY. Soft constraints by domain precedence (entity > resource_type > tenant > platform > system); DENY > STRIP_FIELD > ALLOW. Conditions evaluated for ALLOW_WITH_CONDITIONS. Field permissions applied. Audit record always written. GMX-001 through GMX-010.
+
+### 53.2 Registration Specification (dcm-registration-spec.md)
+
+**Provider Type Registry:** Three-tier (Core/Community/Organization). Each entry declares permissions, default_approval_method, default_trust_level, enabled_in_profiles, capability_schema_ref. Nine core types: service_provider (human_review), meta_provider (dual_approval), storage_provider (dual_approval), policy_provider-mode-3-4 (dual_approval), credential_provider (dual_approval), auth_provider (dual_approval), information_provider/message_bus/notification_provider (human_review).
+
+**Registration token model:** Pre-issued by platform admin (POST /api/v1/admin/registration-tokens). Scoped to provider_type, handle_pattern, sovereignty_zone. single_use. grants_auto_approval flag. Token value presented once — never retrievable. Max trust level bounded by token scope.
+
+**Approval method resolution:** most_restrictive(provider_type_default, profile_min_method, token_grants_auto). Profile can only tighten. Token can relax to auto ONLY if profile.allow_token_auto_approval=true. Committee approval cannot be relaxed by token.
+
+**Profile defaults:** minimal/dev → human_review, token auto-approval enabled. standard → human_review, token auto-approval enabled (max trust: standard). prod → human_review; high-trust types require dual_approval; no token auto-approval. fsi → dual_approval everything; minimum_accreditation: third_party. sovereign → committee everything; minimum_accreditation: regulatory_certification; hardware_attestation required.
+
+**Registration pipeline:** SUBMITTED → VALIDATING (8 automated checks: provider type enabled, governance matrix pre-check, registration token, certificate, sovereignty declaration, capability consistency, health endpoint, accreditation) → PENDING_APPROVAL → ACTIVE. Approval methods: auto (immediate), human_review (one admin), dual_approval (two independent admins), committee (DCMGroup quorum).
+
+**Per-type capability schemas:** service_provider (resource types, capacity model, cancellation support, discovery, naturalization format, cost metadata), information_provider (data domains, authority level, query capacity, confidence model), storage_provider (store types, consistency, replication, encryption), policy_provider (mode 1-4, framework, remote endpoint, shadow mode support), auth_provider (auth modes, MFA methods, RBAC model, token lifetime), notification_provider (delivery channels, guarantees, sovereignty-aware delivery), credential_provider (credential types, secret engines, HSM support), message_bus_provider (protocols, durability, external_endpoints flag), meta_provider (constituent types, composition model, compensation support).
+
+**Federated trust postures:** verified (manually approved; full scope), vouched (Hub-introduced; bounded scope), provisional (crypto-verified; catalog_query only if profile permits). Approval: dev auto-promotes provisional; standard human_review for verified; prod/fsi dual_approval; sovereign committee+hardware-attestation. Profile federation_policy block declares all parameters.
+
+**Ongoing lifecycle:** health monitoring (polling; degraded → reduced routing; failure_threshold → UNAVAILABLE; 2×threshold → drift triggered), certificate rotation (P90D default; P14D warning; P7D transition window), capability amendments (simplified flow), graceful deregistration (entity migration plan required), forced deregistration (dual_approval/committee; entities → INDETERMINATE_REALIZATION; Recovery Policy fires).
+
+### 53.3 Drift Reconciliation Component (doc 25 Section 7)
+
+Control plane component that compares Discovered State vs Realized State. Read-only — never writes to Realized Store. Produces drift records and events into Request Orchestrator.
+
+**Algorithm:** discovery.cycle_complete event → field-by-field comparison per entity → field criticality (from Resource Type Spec) × change magnitude (profile-governed thresholds) → severity matrix (minor/significant/critical) → unsanctioned check (no corresponding Requested State? → elevate one level; fire unsanctioned_change.detected) → drift_record created → drift.detected event → Policy Engine evaluates response.
+
+**Drift record:** entity_uuid, discovery_snapshot_uuid, realized_state_uuid, overall_severity, unsanctioned flag, drifted_fields (field_path, realized_value, discovered_value, field_criticality, change_magnitude, field_severity, elevated_for_unsanctioned), status (open/acknowledged/resolved/escalated).
+
+**Resolution tracking:** Drift record status updated when REVERT (next discovery shows clean) or UPDATE_DEFINITION (new Realized State written) or ACCEPT or entity DECOMMISSIONED. drift.resolved event published.
+
+**Governance matrix integration:** Checks if a governance matrix rule permits the provider to make this type of change. If yes: warning (provider should have submitted update notification). Still treated as drift — provider must use the Provider Update Notification API.
+
+DRC-001 through DRC-005. Nine control plane components now fully defined in doc 25.
+
+---
+
+## SECTION 54 — TERMINOLOGY GLOSSARY
 
 | Term | Definition |
 |------|-----------|
@@ -3480,6 +3562,16 @@ ZT-001 through ZT-005 (zero trust) + ACC-001 through ACC-006 (accreditation). Ke
 | **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
 | **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
 | **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Unified Governance Matrix** | Single enforcement point for all cross-boundary decisions; four axes (subject/data/target/context); hard vs soft enforcement; field-level granularity (allowlist/blocklist/paths); profile-bound defaults; GMX-001–010 |
+| **governance_matrix_rule** | Artifact declaring match conditions across four axes and a decision (ALLOW/DENY/ALLOW_WITH_CONDITIONS/STRIP_FIELD/REDACT/AUDIT_ONLY) with hard or soft enforcement |
+| **sovereignty_zone** | Registered DCM artifact declaring geopolitical/regulatory boundary; rules reference zones by ID; inter-zone agreements declared explicitly |
+| **STRIP_FIELD** | Governance matrix decision: remove named fields from payload and proceed; if stripped field is required → DENY_REQUEST |
+| **REDACT** | Governance matrix decision: replace field value with `<REDACTED>`; field presence preserved; receiver knows field exists but not its value |
+| **Provider Type Registry** | Three-tier registry of approved provider types; each entry declares permissions, default_approval_method, enabled_in_profiles, capability_schema_ref |
+| **registration_token** | Pre-issued by platform admin; scoped to provider_type/handle_pattern/zone; single_use; grants_auto_approval flag; value presented once only |
+| **approval_method** | Registration approval: auto | human_review | dual_approval | committee; resolved as most_restrictive(provider_type_default, profile_min, token_effect) |
+| **Drift Reconciliation Component** | Control plane component; compares Discovered vs Realized State; produces drift records and events; never writes to Realized Store; DRC-001–005 |
+| **drift_record** | Artifact produced by Drift Reconciliation; field-by-field comparison result with severity classification; unsanctioned flag; status tracking through resolution |
 | **Placement Engine** | Six-step algorithm: sovereignty filter → accreditation filter → capability filter → reserve query → tie-breaking (policy/priority/affinity/cost/load/hash) → confirm; PLC-001–006 |
 | **reserve_query** | Parallel capacity queries to all eligible provider candidates; PT5M capacity hold; non-responders and insufficient-capacity providers excluded |
 | **consistent hash** | Final placement tie-breaker: SHA-256(request_uuid+resource_type+sorted_candidates); deterministic; never round-robin |
@@ -3713,7 +3805,7 @@ ZT-001 through ZT-005 (zero trust) + ACC-001 through ACC-006 (accreditation). Ke
 
 ---
 
-## SECTION 54 — OPEN QUESTIONS
+## SECTION 55 — OPEN QUESTIONS
 
 These items are explicitly unresolved. Do not make assumptions about them — flag them and ask for guidance.
 
@@ -3810,7 +3902,7 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
-## SECTION 55 — DOCUMENTATION STRUCTURE
+## SECTION 56 — DOCUMENTATION STRUCTURE
 
 DCM documentation follows a hierarchical structure:
 
@@ -3858,7 +3950,7 @@ content/
 
 ---
 
-## SECTION 56 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 57 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, follow these instructions:
 

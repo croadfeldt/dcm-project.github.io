@@ -203,6 +203,11 @@ deployment_accreditation:
 
 ---
 
+
+> **Architecture Update:** Section 4 of this document (Data/Capability Authorization Matrix) has been superseded by the **Unified Governance Matrix** ([doc 27](27-governance-matrix.md)). The governance matrix provides a more powerful, unified model that replaces the standalone matrix described here. The accreditation model (Sections 2-3) and zero trust interaction model (Section 5) remain current and are consumed by the governance matrix as inputs.
+>
+> New implementations should reference doc 27 for data and capability boundary enforcement.
+
 ## 4. Data/Capability Authorization Matrix
 
 ### 4.1 Purpose

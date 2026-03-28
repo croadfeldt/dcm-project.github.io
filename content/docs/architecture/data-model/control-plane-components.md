@@ -620,7 +620,151 @@ If the Search Index is unavailable:
 
 ---
 
-## 7. Related Policies — Full Component Set
+
+---
+
+## 7. The Drift Reconciliation Component
+
+### 7.1 Role
+
+The Drift Reconciliation Component compares the Discovered State of entities against their Realized State to detect, classify, and respond to drift. It is the consumer of Discovered Store data and the producer of drift records that feed into the Policy Engine for response evaluation.
+
+Drift Reconciliation is purely a read-and-compare component — it never writes to the Realized Store. It reads Discovered State, reads Realized State, computes differences, classifies severity, and fires events into the Request Orchestrator. The Policy Engine and Recovery Policies determine what happens next.
+
+### 7.2 Inputs and Outputs
+
+**Inputs:**
+- Discovered State snapshots (from Discovered Store, written by Discovery Scheduler)
+- Realized State snapshots (from Realized Store)
+- Resource Type Specifications (for field criticality declarations used in severity classification)
+- Active governance profile (for magnitude thresholds used in severity classification)
+
+**Outputs:**
+- Drift records (written to Drift Record Store — a lightweight operational store)
+- Drift events published to the Request Orchestrator: `drift.detected`, `drift.resolved`, `drift.severity_escalated`
+- Unsanctioned change events: `unsanctioned_change.detected`
+
+### 7.3 Comparison Algorithm
+
+```
+Discovery cycle completes → Discovered State snapshot written
+  │
+  ▼ Drift Reconciliation Component receives discovery.cycle_complete event
+  │
+  ▼ For each entity UUID in the discovery snapshot:
+  │
+  │   Load: latest Realized State snapshot for entity UUID
+  │   Load: Discovered State snapshot (just written)
+  │   Load: Resource Type Specification (field criticality per field)
+  │
+  ▼ Field-by-field comparison:
+  │   For each field in Realized State:
+  │     Does Discovered State contain this field?
+  │     If yes: are the values equal?
+  │     If no: field is absent — severity based on field criticality
+  │   For each field in Discovered State not in Realized State:
+  │     New field appeared — severity based on field criticality
+  │
+  ▼ Severity classification (per field):
+  │   Field criticality (from Resource Type Spec) × Change magnitude (profile-governed)
+  │   → severity matrix → minor | significant | critical
+  │   Unsanctioned? → elevate one level
+  │   Multiple drifted fields? → overall = highest individual severity
+  │
+  ▼ Unsanctioned check:
+  │   Is there a Requested State record that explains this change?
+  │   If yes: sanctioned change (may still be drift if realization didn't match)
+  │   If no: unsanctioned_change.detected event fired (in addition to drift.detected)
+  │
+  ├── No drift detected:
+  │     Update entity.last_discovered_at
+  │     Update entity.drift_status = clean
+  │     No drift record created
+  │
+  └── Drift detected:
+        Create drift record
+        Publish drift.detected to Request Orchestrator
+        Policy Engine evaluates → response action
+```
+
+### 7.4 Drift Record Structure
+
+```yaml
+drift_record:
+  uuid: <uuid>
+  entity_uuid: <uuid>
+  detected_at: <ISO 8601>
+  discovery_snapshot_uuid: <uuid>        # the Discovered State snapshot that triggered this
+  realized_state_uuid: <uuid>            # the Realized State snapshot compared against
+
+  overall_severity: minor | significant | critical
+  unsanctioned: true | false             # true if no corresponding Requested State record
+
+  drifted_fields:
+    - field_path: "fields.memory_gb"
+      realized_value: 8
+      discovered_value: 16
+      field_criticality: medium           # from Resource Type Spec
+      change_magnitude: significant       # 100% increase, threshold: standard 10-50%
+      field_severity: significant
+      elevated_for_unsanctioned: true     # elevated from significant → critical
+
+  status: open | acknowledged | resolved | escalated
+  resolution:
+    resolved_at: <ISO 8601|null>
+    resolution_type: reverted | updated_definition | accepted | escalated | null
+    resolved_by_requested_state_uuid: <uuid|null>
+```
+
+### 7.5 Drift Resolution Tracking
+
+Drift records are not resolved by the Drift Reconciliation Component — they are resolved by the Policy Engine's response actions. The Drift Reconciliation Component monitors for resolution:
+
+```
+REVERT action taken:
+  New Requested State submitted → provider reverts → new Realized State written
+  Next discovery cycle: Discovered State matches new Realized State
+  Drift Reconciliation: no drift detected → drift_record.status = resolved
+  drift.resolved event published
+
+UPDATE_DEFINITION action taken:
+  Consumer submits UPDATE_DEFINITION → new Realized State written with discovered values
+  Next discovery cycle: Discovered State matches new Realized State
+  Drift record.status = resolved with resolution_type: updated_definition
+
+Entity decommissioned:
+  Drift record.status = resolved with resolution_type: decommissioned
+```
+
+### 7.6 Governance Matrix Integration
+
+Before classifying a discovered change as drift, the Drift Reconciliation Component evaluates the governance matrix to determine if the change is expected:
+
+```
+Field value in Discovered State differs from Realized State
+  │
+  ▼ Check: Is there a governance matrix rule that permits this provider
+  │        to make this type of change to this field?
+  │
+  ├── Yes → This may be a Provider Update Notification that wasn't submitted
+  │   DCM logs a warning: "Provider changed field without submitting update notification"
+  │   Still treated as drift — provider should have submitted update notification
+  │
+  └── No → Standard drift detection; severity classification runs
+```
+
+### 7.7 Drift Reconciliation Policies
+
+| Policy | Rule |
+|--------|------|
+| `DRC-001` | The Drift Reconciliation Component never writes to the Realized Store. It produces drift records and events only. |
+| `DRC-002` | Drift detection runs after every discovery cycle. An entity with no corresponding Realized State record is an orphan candidate — not a drift event. |
+| `DRC-003` | Unsanctioned changes are always elevated one severity level above the matrix classification. An unsanctioned significant drift is reported as critical. |
+| `DRC-004` | Drift records are retained until the entity is decommissioned plus the configured audit retention period. They are not deleted on resolution — resolution is recorded within the record. |
+| `DRC-005` | Drift detection produces events into the Request Orchestrator. The Policy Engine determines the response action. The Drift Reconciliation Component does not initiate remediation directly. |
+
+
+## 8. Related Policies — Full Component Set
 
 | Policy | Rule |
 |--------|------|
@@ -632,6 +776,7 @@ If the Search Index is unavailable:
 | `PLC-001` through `PLC-006` | Placement Engine policies (see Section 4.7) |
 | `LCE-001` through `LCE-005` | Lifecycle Constraint Enforcer policies (see Section 5.7) |
 | `SIX-001` through `SIX-004` | Search Index policies (see Section 6.6) |
+| `DRC-001` through `DRC-005` | Drift Reconciliation policies (see Section 7.7) |
 
 ---
 
