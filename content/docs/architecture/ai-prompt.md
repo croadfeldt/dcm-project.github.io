@@ -3559,54 +3559,6 @@ DRC-001 through DRC-005. Nine control plane components now fully defined in doc 
 
 ---
 
-## SECTION 59 — EXAMPLES AND USE CASES (dcm-examples.md)
-
-### Orchestration Examples (8 scenarios)
-
-**1.1 Basic request lifecycle** — submit → layers_assembled (GateKeeper + Transformation fire) → placement (6-step) → dispatch → realized. Shows named workflow + dynamic policies composing on same events.
-
-**1.2 Human approval gate** — GateKeeper with `requires_approval: true` flag inserts AWAITING_APPROVAL step without modifying named workflow. Manager approves via API → pipeline resumes.
-
-**1.3 Policy-gated hard block** — GateKeeper denies unsupported OS. Consumer receives clear error with policy_uuid and suggestion. No requires_approval flag → terminal FAILED.
-
-**1.4 Compound service (Meta Provider)** — VM + IP + DNS + LoadBalancer. Dependency-ordered execution (parallel where no deps). DNS fails (partial delivery) → DEGRADED state. Recovery: NOTIFY_AND_WAIT. Consumer chooses: accept degraded or trigger DNS retry.
-
-**1.5 Drift detection + remediation** — Discovery finds memory_gb changed (unsanctioned). Drift: significant + unsanctioned → critical. Policy: ESCALATE. Consumer submits REVERT → new request cycle → next discovery clean.
-
-**1.6 Dispatch timeout + late response** — Provider silent for PT30M → TIMEOUT_PENDING → Recovery: NOTIFY_AND_WAIT (prod profile). Provider responds at T+45M → LATE_RESPONSE_RECEIVED. Consumer chooses DISCARD_AND_REQUEUE.
-
-**1.7 Federation-routed request** — Local providers at capacity. Placement queries Hub DCM (Peer DCM provider). Hub routes to Regional DCM B. Governance Matrix checked at each hop. Realized State flows back chain. entity_uuid preserved.
-
-**1.8 Brownfield ingestion** — Discovery finds unmanaged VM. Orchestration Flow Policy: discover → INGEST → ENRICH (CMDB query) → await operator → PROMOTE to tenant. Drift detection activated post-promotion.
-
-### Provider Examples (4 scenarios)
-
-**2.1 Service Provider dispatch cycle** — Full payload showing DCM unified format → naturalize to OpenStack Nova → execute → denaturalize back. Shows provenance on injected fields (monitoring_endpoint from policy).
-
-**2.2 Information Provider enrichment** — CMDB query during layer assembly. Response with confidence descriptor. Fields injected with source_type: information_provider and source_uuid.
-
-**2.3 Policy Provider Mode 3 (OPA sidecar)** — Exact OPA HTTP API call format, input document structure, response parsing.
-
-**2.4 Notification Provider delivery** — VLAN decommission event. Audience: owner (NetworkOps) + 2 stakeholders (required stakes) + 1 observer (optional stake). Per-actor envelopes with stakeholder_reason field. Slack message format.
-
-### Consumer API Examples (2 scenarios)
-
-**3.1 Complete request lifecycle** — catalog browse → describe (see constraints) → submit → poll status sequence → get realized resource with confidence scores.
-
-**3.2 Provider update approval** — Provider submits auto-scale notification → REQUIRES_CONSUMER_APPROVAL → consumer reviews pending notifications → approve → new Realized State.
-
-### Admin API Examples (2 scenarios)
-
-**4.1 Provider registration review** — List pending registrations (with validation results) → approve with review notes.
-
-**4.2 Orphan resolution** — List orphan candidates → investigate → adopt_into_dcm → entity promoted to full lifecycle.
-
-### Registration Flow Example (1 scenario)
-
-**5.1 Complete provider onboarding** — Admin issues registration token → provider submits registration payload (mTLS + token) → 8 automated validation checks shown → PENDING_APPROVAL → admin reviews → ACTIVE. Full capability declaration structure for Service Provider.
-
----
-
 
 ## SECTION 54 — TERMINOLOGY GLOSSARY
 
@@ -4056,7 +4008,55 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
-## SECTION 59b — CAPABILITIES MATRIX UPDATE (130 capabilities, 20 domains)
+## SECTION 57 — EXAMPLES AND USE CASES (dcm-examples.md)
+
+### Orchestration Examples (8 scenarios)
+
+**1.1 Basic request lifecycle** — submit → layers_assembled (GateKeeper + Transformation fire) → placement (6-step) → dispatch → realized. Shows named workflow + dynamic policies composing on same events.
+
+**1.2 Human approval gate** — GateKeeper with `requires_approval: true` flag inserts AWAITING_APPROVAL step without modifying named workflow. Manager approves via API → pipeline resumes.
+
+**1.3 Policy-gated hard block** — GateKeeper denies unsupported OS. Consumer receives clear error with policy_uuid and suggestion. No requires_approval flag → terminal FAILED.
+
+**1.4 Compound service (Meta Provider)** — VM + IP + DNS + LoadBalancer. Dependency-ordered execution (parallel where no deps). DNS fails (partial delivery) → DEGRADED state. Recovery: NOTIFY_AND_WAIT. Consumer chooses: accept degraded or trigger DNS retry.
+
+**1.5 Drift detection + remediation** — Discovery finds memory_gb changed (unsanctioned). Drift: significant + unsanctioned → critical. Policy: ESCALATE. Consumer submits REVERT → new request cycle → next discovery clean.
+
+**1.6 Dispatch timeout + late response** — Provider silent for PT30M → TIMEOUT_PENDING → Recovery: NOTIFY_AND_WAIT (prod profile). Provider responds at T+45M → LATE_RESPONSE_RECEIVED. Consumer chooses DISCARD_AND_REQUEUE.
+
+**1.7 Federation-routed request** — Local providers at capacity. Placement queries Hub DCM (Peer DCM provider). Hub routes to Regional DCM B. Governance Matrix checked at each hop. Realized State flows back chain. entity_uuid preserved.
+
+**1.8 Brownfield ingestion** — Discovery finds unmanaged VM. Orchestration Flow Policy: discover → INGEST → ENRICH (CMDB query) → await operator → PROMOTE to tenant. Drift detection activated post-promotion.
+
+### Provider Examples (4 scenarios)
+
+**2.1 Service Provider dispatch cycle** — Full payload showing DCM unified format → naturalize to OpenStack Nova → execute → denaturalize back. Shows provenance on injected fields (monitoring_endpoint from policy).
+
+**2.2 Information Provider enrichment** — CMDB query during layer assembly. Response with confidence descriptor. Fields injected with source_type: information_provider and source_uuid.
+
+**2.3 Policy Provider Mode 3 (OPA sidecar)** — Exact OPA HTTP API call format, input document structure, response parsing.
+
+**2.4 Notification Provider delivery** — VLAN decommission event. Audience: owner (NetworkOps) + 2 stakeholders (required stakes) + 1 observer (optional stake). Per-actor envelopes with stakeholder_reason field. Slack message format.
+
+### Consumer API Examples (2 scenarios)
+
+**3.1 Complete request lifecycle** — catalog browse → describe (see constraints) → submit → poll status sequence → get realized resource with confidence scores.
+
+**3.2 Provider update approval** — Provider submits auto-scale notification → REQUIRES_CONSUMER_APPROVAL → consumer reviews pending notifications → approve → new Realized State.
+
+### Admin API Examples (2 scenarios)
+
+**4.1 Provider registration review** — List pending registrations (with validation results) → approve with review notes.
+
+**4.2 Orphan resolution** — List orphan candidates → investigate → adopt_into_dcm → entity promoted to full lifecycle.
+
+### Registration Flow Example (1 scenario)
+
+**5.1 Complete provider onboarding** — Admin issues registration token → provider submits registration payload (mTLS + token) → 8 automated validation checks shown → PENDING_APPROVAL → admin reviews → ACTIVE. Full capability declaration structure for Service Provider.
+
+---
+
+## SECTION 58 — CAPABILITIES MATRIX UPDATE (119 capabilities, 19 domains)
 
 Five new domains added to the capabilities matrix. Total: 119 capabilities across 19 domains.
 
@@ -4080,7 +4080,7 @@ consumer-api-spec.md (missing complete lifecycle endpoint coverage) · dcm-flow-
 ---
 
 
-## SECTION 57 — DOCUMENTATION STRUCTURE
+## SECTION 59 — DOCUMENTATION STRUCTURE
 
 DCM documentation follows a hierarchical structure:
 
@@ -4128,7 +4128,7 @@ content/
 
 ---
 
-## SECTION 58 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 60 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, follow these instructions:
 
