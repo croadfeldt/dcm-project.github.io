@@ -424,6 +424,13 @@ Providers are **custodians** of the underlying infrastructure — they are not t
 | **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
 | **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
 | **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Placement Engine** | Six-step algorithm: sovereignty filter → accreditation filter → capability filter → reserve query → tie-breaking (policy/priority/affinity/cost/load/hash) → confirm; PLC-001–006 |
+| **reserve_query** | Parallel capacity queries to all eligible provider candidates; PT5M capacity hold; non-responders and insufficient-capacity providers excluded |
+| **consistent hash** | Final placement tie-breaker: SHA-256(request_uuid+resource_type+sorted_candidates); deterministic; never round-robin |
+| **Lifecycle Constraint Enforcer** | Monitors TTL/expiry/max_execution_time; fires expiry actions through standard pipeline; grace period before action; Process Resources: immediate FAILED on breach; LCE-001–005 |
+| **Search Index** | Non-authoritative queryable projection of GitOps stores; indexes key fields; returns git_path for full payload; max staleness PT5M; always rebuildable; SIX-001–004 |
+| **Admin API** | Platform admin REST interface: Tenant lifecycle, provider review, accreditation approval, discovery trigger, orphan resolution, recovery decisions, quota management, Search Index rebuild, bootstrap operations |
+| **PENDING_EXPIRY_ACTION** | Entity state when expiry action fails to execute; Lifecycle Constraint Enforcer retries per Recovery Policy; Platform Admin notified urgency: high |
 | **data_classification** | First-class field metadata: public/internal/confidential/restricted/phi/pci/sovereign/classified; phi/sovereign/classified are immutable once set |
 | **Accreditation** | Formal versioned attestation that a component satisfies a compliance framework; issued by an Accreditor; carries validity period; lifecycle: developing→proposed→active→expired/revoked |
 | **Accreditor** | Entity that issues accreditations: government body, regulatory body, QSA, certification body, or internal audit team |
@@ -2508,6 +2515,13 @@ The Ship/Shore/Enclave terminology from defense IT contexts has been replaced th
 | **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
 | **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
 | **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Placement Engine** | Six-step algorithm: sovereignty filter → accreditation filter → capability filter → reserve query → tie-breaking (policy/priority/affinity/cost/load/hash) → confirm; PLC-001–006 |
+| **reserve_query** | Parallel capacity queries to all eligible provider candidates; PT5M capacity hold; non-responders and insufficient-capacity providers excluded |
+| **consistent hash** | Final placement tie-breaker: SHA-256(request_uuid+resource_type+sorted_candidates); deterministic; never round-robin |
+| **Lifecycle Constraint Enforcer** | Monitors TTL/expiry/max_execution_time; fires expiry actions through standard pipeline; grace period before action; Process Resources: immediate FAILED on breach; LCE-001–005 |
+| **Search Index** | Non-authoritative queryable projection of GitOps stores; indexes key fields; returns git_path for full payload; max staleness PT5M; always rebuildable; SIX-001–004 |
+| **Admin API** | Platform admin REST interface: Tenant lifecycle, provider review, accreditation approval, discovery trigger, orphan resolution, recovery decisions, quota management, Search Index rebuild, bootstrap operations |
+| **PENDING_EXPIRY_ACTION** | Entity state when expiry action fails to execute; Lifecycle Constraint Enforcer retries per Recovery Policy; Platform Admin notified urgency: high |
 | **data_classification** | First-class field metadata: public/internal/confidential/restricted/phi/pci/sovereign/classified; phi/sovereign/classified are immutable once set |
 | **Accreditation** | Formal versioned attestation that a component satisfies a compliance framework; issued by an Accreditor; carries validity period; lifecycle: developing→proposed→active→expired/revoked |
 | **Accreditor** | Entity that issues accreditations: government body, regulatory body, QSA, certification body, or internal audit team |
@@ -3466,6 +3480,13 @@ ZT-001 through ZT-005 (zero trust) + ACC-001 through ACC-006 (accreditation). Ke
 | **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
 | **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
 | **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Placement Engine** | Six-step algorithm: sovereignty filter → accreditation filter → capability filter → reserve query → tie-breaking (policy/priority/affinity/cost/load/hash) → confirm; PLC-001–006 |
+| **reserve_query** | Parallel capacity queries to all eligible provider candidates; PT5M capacity hold; non-responders and insufficient-capacity providers excluded |
+| **consistent hash** | Final placement tie-breaker: SHA-256(request_uuid+resource_type+sorted_candidates); deterministic; never round-robin |
+| **Lifecycle Constraint Enforcer** | Monitors TTL/expiry/max_execution_time; fires expiry actions through standard pipeline; grace period before action; Process Resources: immediate FAILED on breach; LCE-001–005 |
+| **Search Index** | Non-authoritative queryable projection of GitOps stores; indexes key fields; returns git_path for full payload; max staleness PT5M; always rebuildable; SIX-001–004 |
+| **Admin API** | Platform admin REST interface: Tenant lifecycle, provider review, accreditation approval, discovery trigger, orphan resolution, recovery decisions, quota management, Search Index rebuild, bootstrap operations |
+| **PENDING_EXPIRY_ACTION** | Entity state when expiry action fails to execute; Lifecycle Constraint Enforcer retries per Recovery Policy; Platform Admin notified urgency: high |
 | **data_classification** | First-class field metadata: public/internal/confidential/restricted/phi/pci/sovereign/classified; phi/sovereign/classified are immutable once set |
 | **Accreditation** | Formal versioned attestation that a component satisfies a compliance framework; issued by an Accreditor; carries validity period; lifecycle: developing→proposed→active→expired/revoked |
 | **Accreditor** | Entity that issues accreditations: government body, regulatory body, QSA, certification body, or internal audit team |
