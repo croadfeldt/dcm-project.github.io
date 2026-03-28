@@ -24,7 +24,7 @@ weight: 4
 
 
 **Version:** 0.1.0-draft  
-**Status:** Design — Not yet implemented  
+**Status:** Draft — Ready for implementation feedback
 **Document Type:** Technical Design  
 **Language:** Go  
 **Repository:** https://github.com/dcm-project/operator-sdk  

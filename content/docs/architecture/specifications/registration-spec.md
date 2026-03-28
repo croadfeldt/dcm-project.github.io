@@ -4,12 +4,14 @@ type: docs
 weight: 3
 ---
 
-> **⚠️ Work in Progress**
+> **📋 Draft**
+>
+> This specification has been promoted from Work in Progress to Draft status. All questions resolved. Complete registration pipeline for all 9 provider types with full capability declaration schemas and federation trust model. It is ready for implementation feedback but has not yet been formally reviewed for final release.
 >
 > This specification defines the unified registration flow for all DCM provider types. Published to share design direction and invite feedback.
 
 **Version:** 0.1.0-draft
-**Status:** Design — Not yet implemented
+**Status:** Draft — Ready for implementation feedback
 **Document Type:** Technical Specification
 **Related Documents:** [Control Plane Components](../data-model/25-control-plane-components.md) | [Governance Matrix](../data-model/27-governance-matrix.md) | [Accreditation and Authorization Matrix](../data-model/26-accreditation-and-authorization-matrix.md) | [Policy Profiles](../data-model/14-policy-profiles.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md)
 

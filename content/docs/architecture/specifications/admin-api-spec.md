@@ -4,12 +4,14 @@ type: docs
 weight: 1
 ---
 
-> **⚠️ Work in Progress**
+> **📋 Draft**
+>
+> This specification has been promoted from Work in Progress to Draft status. Complete Admin API covering all platform admin operations with request/response examples. It is ready for implementation feedback but has not yet been formally reviewed for final release.
 >
 > This specification defines the DCM Admin API — the platform administration interface. Published to share design direction and invite feedback. Do not build production integrations against this specification until it reaches draft status.
 
 **Version:** 0.1.0-draft
-**Status:** Design — Not yet implemented
+**Status:** Draft — Ready for implementation feedback
 **Document Type:** Technical Specification
 **Related Documents:** [Consumer API Specification](consumer-api-spec.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md) | [Control Plane Components](../data-model/25-control-plane-components.md) | [Accreditation and Authorization Matrix](../data-model/26-accreditation-and-authorization-matrix.md)
 

@@ -4056,6 +4056,31 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
+## SECTION 59b — CAPABILITIES MATRIX UPDATE (130 capabilities, 20 domains)
+
+Five new domains added to the capabilities matrix. Total: 130 capabilities across 20 domains.
+
+**New domains:**
+
+**16. Accreditation Management (ACC-001–006):** Accreditation submission and approval, lifecycle monitoring with P90D renewal warnings, gap response via Recovery Policy, data classification enforcement at interaction boundaries, DCM deployment-level accreditation for federation trust.
+
+**17. Zero Trust and Security Posture (ZTS-001–006):** mTLS enforcement, scoped short-lived interaction credentials, certificate rotation management (P14D warning, P7D transition window), zero_trust_posture profile configuration (none/boundary/full/hardware_attested), hardware attestation for sovereign profile, five-check boundary enforcement (identity → authorization → accreditation → matrix → sovereignty).
+
+**18. Unified Governance Matrix (GMX-001–007):** Rule authoring in GitOps (four-axis match), boundary enforcement evaluation with rule_uuid in DENY responses, field-level data control (allowlist/blocklist, STRIP_FIELD/REDACT/DENY_REQUEST), sovereignty zone management, compliance domain matrix activation, Tenant/resource-type override rules, rule lifecycle with shadow mode validation.
+
+**19. Drift Reconciliation (DRC-001–005):** Drift record production with field-level detail, unsanctioned change classification and severity escalation, drift severity classification (field criticality × change magnitude), drift resolution tracking with clean-state confirmation, governance matrix integration for expected provider change detection.
+
+**20. Cluster as a Service (CAS-001–006):** Cluster catalog item (Tenant owns entire cluster entity), cluster sovereignty placement, cluster lifecycle management (scale/upgrade/decommission), cluster as nested provider registration (DCM provisions cluster → cluster becomes workload Service Provider), cluster-scoped resource ownership model (Tenant-owned within cluster vs __platform__-owned shared infrastructure), kubeconfig and credential management via Credential Provider.
+
+**6 specifications graduated from WIP to Draft:**
+dcm-registration-spec.md · dcm-opa-integration-spec.md · 11-kubernetes-compatibility.md · dcm-operator-interface-spec.md · dcm-operator-sdk-api.md · dcm-admin-api-spec.md
+
+**2 specifications remain WIP:**
+consumer-api-spec.md (missing complete lifecycle endpoint coverage) · dcm-flow-gui-spec.md (conceptual only; interaction model not yet specified)
+
+---
+
+
 ## SECTION 57 — DOCUMENTATION STRUCTURE
 
 DCM documentation follows a hierarchical structure:
