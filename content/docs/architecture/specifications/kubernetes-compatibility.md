@@ -1,7 +1,7 @@
 ---
-title: "Kubernetes Compatibility and Concept Mappings"
+title: "Kubernetes Compatibility"
 type: docs
-weight: 1
+weight: 6
 ---
 
 
@@ -138,6 +138,50 @@ DCM manages the management plane — the lifecycle of what gets requested, provi
 | Cluster deletion | DCM decommission workflow | Cluster deletion triggers DCM's full decommission lifecycle — lifecycle policies applied to all related entities | |
 
 ---
+
+
+## 3a. Cluster as a Service — The Primary Model
+
+A Kubernetes cluster is a first-class catalog item in DCM. Any authorized Tenant can request and own a cluster through the service catalog, the same way they request a VM or a network. This is not a special case — it is the expected primary consumption model for Kubernetes infrastructure in DCM.
+
+**How it works:**
+
+```yaml
+# Consumer requests a cluster via the catalog
+catalog_item: Platform.KubernetesCluster
+provider: CAPI-based Service Provider (or managed K8s Service Provider)
+tenant_uuid: <requesting-tenant-uuid>
+
+# The resulting entity:
+entity:
+  resource_type: Platform.KubernetesCluster
+  tenant_uuid: <requesting-tenant-uuid>   # Tenant owns the cluster
+  lifecycle_state: OPERATIONAL
+  fields:
+    kubernetes_version: "1.29"
+    node_count: 3
+    api_endpoint: "https://cluster-01.eu-west.example.com"
+    kubeconfig_ref: <credential-provider-ref>  # via Credential Provider
+```
+
+**Ownership scope:** When a Tenant owns a `Platform.KubernetesCluster` entity, that Tenant owns everything within the cluster boundary — including cluster-scoped resources (ClusterRoles, StorageClasses, PersistentVolumes, CRDs registered for that cluster). The cluster entity is the ownership boundary. DCM treats the cluster as an opaque resource from a Tenant ownership perspective — the Tenant gets the cluster; what's inside it belongs to them.
+
+**The Meta Provider pattern:** A Cluster-as-a-Service catalog item typically composes multiple constituent resources:
+```yaml
+Platform.KubernetesCluster → constituent providers:
+  - Compute resources (control plane + worker nodes)
+  - Network resources (load balancer, ingress)
+  - Storage resources (CSI driver + storage class)
+  - DNS records (cluster API endpoint)
+  - Credential issuance (kubeconfig via Credential Provider)
+```
+
+This is a Meta Provider — the cluster catalog item orchestrates all constituents and presents a single entity to the Tenant.
+
+**Sovereignty and accreditation:** Cluster placement follows the standard Placement Engine model. Sovereignty constraints declared by the Tenant apply to cluster placement — a GDPR-scoped Tenant requesting a cluster gets a cluster placed in an EU sovereignty zone. The CAPI provider (or managed K8s Service Provider) must hold appropriate accreditations.
+
+**Post-provision:** Once the cluster is OPERATIONAL, it can optionally register with DCM as a nested Service Provider for workload resources. The Tenant can then request workload resources (Deployments, Services, PersistentVolumes) against their cluster through the same DCM service catalog. This creates the superset model: DCM provisions the cluster → cluster becomes a workload Service Provider → Tenant uses DCM to manage workloads on their cluster.
+
 
 ## 4. Where DCM Extends Beyond Kubernetes
 
@@ -344,11 +388,11 @@ Operators implement Level 3 — sovereignty declarations, provenance, discovery 
 
 | # | Question | Impact | Status |
 |---|----------|--------|--------|
-| 1 | How does the Namespace-to-Tenant mapping work when a cluster has existing namespaces that predate DCM adoption? | Brownfield migration | ❓ Unresolved |
-| 2 | Should `Platform.KubernetesCluster` be the boundary for a DCM deployment, or can DCM manage resources across clusters without treating the cluster as a DCM entity? | Architecture scope | ❓ Unresolved |
-| 3 | How does DCM interact with Kubernetes admission webhooks — do they duplicate Policy Engine functions or complement them? | Policy model | ❓ Unresolved |
-| 4 | Should the Kubernetes Information Provider be a built-in DCM component or a separately deployed provider? | Deployment architecture | ❓ Unresolved |
-| 5 | How does the DCM superset model interact with managed Kubernetes services (EKS, GKE, AKS) where cluster management is outside the user's control? | Cloud provider integration | ❓ Unresolved |
+| 1 | How does the Namespace-to-Tenant mapping work when a cluster has existing namespaces that predate DCM adoption? | Brownfield migration | ✅ Resolved |
+| 2 | Should `Platform.KubernetesCluster` be the boundary for a DCM deployment, or can DCM manage resources across clusters without treating the cluster as a DCM entity? | Architecture scope | ✅ Resolved |
+| 3 | How does DCM interact with Kubernetes admission webhooks — do they duplicate Policy Engine functions or complement them? | Policy model | ✅ Resolved |
+| 4 | Should the Kubernetes Information Provider be a built-in DCM component or a separately deployed provider? | Deployment architecture | ✅ Resolved |
+| 5 | How does the DCM superset model interact with managed Kubernetes services (EKS, GKE, AKS) where cluster management is outside the user's control? | Cloud provider integration | ✅ Resolved |
 
 ---
 
@@ -362,5 +406,19 @@ Operators implement Level 3 — sovereignty declarations, provenance, discovery 
 - **Four States** — DCM's Intent/Requested/Realized/Discovered model, which extends Kubernetes' desired/actual model
 
 ---
+
+
+
+## Resolution Notes
+
+**Q1:** Pre-existing namespaces are handled by the brownfield ingestion model. Each namespace maps to one DCM Tenant. Resources without clear ownership land in the `__transitional__` Tenant and are promoted by a platform admin. Same flow as brownfield VM ingestion — no special handling required.
+
+**Q2:** DCM manages resources across multiple clusters simultaneously. `Platform.KubernetesCluster` is a DCM-managed resource type — both something DCM provisions as a catalog item (Cluster as a Service) and something DCM tracks when externally provisioned. A Tenant can own a full cluster as a catalog item; the cluster is not the boundary of a DCM deployment. DCM's organizational boundary is the Tenant. A single DCM deployment routes requests to Service Providers across many clusters, and can provision new clusters as service catalog items.
+
+**Q3:** Admission webhooks and the DCM Policy Engine are complementary layers, not duplicates. Admission webhooks enforce cluster-native policy (security contexts, image policies, resource quotas). The DCM Policy Engine enforces DCM request policy (business rules, data governance, sovereignty). A DCM-managed workload resource is validated by both — DCM Policy Engine before dispatch, admission webhook at the cluster. This is defense in depth.
+
+**Q4:** The Kubernetes Information Provider is a separately deployed provider that registers with DCM as a standard Information Provider. It serves cluster state, namespace inventory, and workload status. There are no built-in Information Providers in DCM's architecture — all Information Providers follow the unified base contract and are independently deployable.
+
+**Q5:** Managed Kubernetes services (EKS, GKE, AKS) register as Service Providers of resource type `Platform.ManagedKubernetesCluster`. DCM manages workload resources within the cluster (Deployments, Services, PersistentVolumes) but explicitly does not manage the cluster control plane. Sovereignty enforcement applies at cluster selection — DCM places workloads on clusters satisfying sovereignty constraints. The cloud provider manages cluster infrastructure.
 
 *Document maintained by the DCM Project. For questions or contributions see [GitHub](https://github.com/dcm-project).*

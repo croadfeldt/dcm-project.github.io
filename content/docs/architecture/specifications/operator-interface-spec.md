@@ -986,12 +986,12 @@ Operators must monitor for changes to DCM-managed CRs that did not originate fro
 
 | # | Question | Impact | Status |
 |---|----------|--------|--------|
-| 1 | Should the specification be submitted to CNCF as a sandbox project or proposed as a Kubernetes SIG? | Community adoption strategy | ❓ Unresolved |
-| 2 | Should conformance certification be self-certified (test suite passes) or require DCM project review? | Community trust | ❓ Unresolved |
-| 3 | How should the specification handle operators that manage cluster-scoped (non-namespaced) resources? | Namespace strategy | ❓ Unresolved |
-| 4 | Should the SDK support non-Go operator frameworks (Java Operator SDK, Python kopf)? | Ecosystem breadth | ❓ Unresolved |
-| 5 | How does the specification interact with Kubernetes Cluster API — can CAPI clusters be DCM-managed resources? | Scope | ❓ Unresolved |
-| 6 | Should there be a Level 0 — a pure label-based passive mode requiring no operator changes? | Adoption friction | ❓ Unresolved |
+| 1 | Should the specification be submitted to CNCF as a sandbox project or proposed as a Kubernetes SIG? | Community adoption strategy | ✅ Resolved |
+| 2 | Should conformance certification be self-certified (test suite passes) or require DCM project review? | Community trust | ✅ Resolved |
+| 3 | How should the specification handle operators that manage cluster-scoped (non-namespaced) resources? | Namespace strategy | ✅ Resolved — Two models: (A) Cluster-as-a-Service: Tenant owns the entire cluster entity including all cluster-scoped resources within it; (B) Shared cluster: cluster-scoped governance resources belong to __platform__ Tenant. Cluster-as-a-Service is the primary model. |
+| 4 | Should the SDK support non-Go operator frameworks (Java Operator SDK, Python kopf)? | Ecosystem breadth | ✅ Resolved |
+| 5 | How does the specification interact with Kubernetes Cluster API — can CAPI clusters be DCM-managed resources? | Scope | ✅ Resolved |
+| 6 | Should there be a Level 0 — a pure label-based passive mode requiring no operator changes? | Adoption friction | ✅ Resolved |
 
 ---
 
@@ -1037,3 +1037,25 @@ Operators must monitor for changes to DCM-managed CRs that did not originate fro
 ---
 
 *This specification is maintained by the DCM Project. For questions, contributions, or conformance certification see [GitHub](https://github.com/dcm-project).*
+
+
+## Resolution Notes
+
+**Q1:** Submit the Operator Interface Specification as a CNCF specification project (not a Sandbox project requiring a working implementation). SIG App Delivery and SIG Cluster Lifecycle engagement happens before submission. See cncf-strategy.md for the full submission strategy.
+
+**Q2:** Self-certified via automated test suite is the conformance gate — this is the low-friction path that enables broad adoption. An optional 'DCM Verified' badge is available via DCM project review for organizations wanting a higher-trust production claim. This mirrors Kubernetes conformance: automated test suite gates access; CNCF certification provides the badge.
+
+**Q3:** Two distinct models apply, and it is important to not conflate them:
+
+**Model A — Cluster as a Service (the primary model):** A Kubernetes cluster is a catalog item that any authorized Tenant can request and own. The Tenant owns the entire cluster entity — including all cluster-scoped resources within it (ClusterRoles, StorageClasses, PersistentVolumes, etc.) — because the cluster itself is the resource boundary. The `Platform.KubernetesCluster` catalog item is provisioned by a Cluster-as-a-Service Provider (e.g., a CAPI-backed operator). Once provisioned, the cluster is a Resource Entity owned by the requesting Tenant. Everything within that cluster is scoped to that Tenant's ownership. This is the primary model — users and Tenant owners fully expect to request and own clusters as a service through the catalog.
+
+**Model B — Shared cluster infrastructure (the exception):** When multiple Tenants share a single cluster (the multi-tenant cluster model), cluster-scoped resources that govern the shared infrastructure itself (admission webhook configurations, cluster-level network policies, CRD registrations) cannot be owned by any single Tenant — they belong to the `__platform__` system Tenant. These are resources that, if modified by a Tenant, would affect all other Tenants on the cluster. The distinction: resources *inside* a Tenant-owned cluster are always Tenant-owned; resources that *govern shared cluster infrastructure* belong to `__platform__`.
+
+**The rule:** Cluster-scoped resources are owned by the Tenant that owns the cluster. If no single Tenant owns the cluster (shared infrastructure), cluster-scoped governance resources belong to `__platform__`. Operators managing cluster-scoped resources implement the standard base contract. The catalog item scope (`scope: cluster` vs `scope: namespaced`) determines which ownership model applies and what role is required to request it.
+
+**Q4:** The Operator Interface Specification is a REST/HTTP API specification and is language-agnostic by definition. The Go SDK is the reference implementation. Operators in any language implement the specification directly via HTTP — no language-specific adapter is required. Community SDKs for Java and Python are encouraged as community projects under the DCM umbrella; the DCM project does not maintain them in v1.
+
+**Q5:** CAPI clusters are `Platform.KubernetesCluster` resources in DCM. The CAPI operator registers as a Service Provider for this resource type. Once provisioned, a CAPI cluster can optionally register with DCM as a nested DCM deployment or as a Service Provider for workload resources (the Meta Provider pattern). Sovereignty constraints are enforced at the CAPI provider selection level.
+
+**Q6:** Level 0 exists as a label-based passive discovery mode. Organizations apply DCM labels to existing operator-managed resources. DCM discovers and tracks these resources (they appear in inventory, drift detection runs against them) but DCM does not dispatch to or control them. No operator code changes are required for Level 0. This is the brownfield ingestion model applied to operators — the lowest possible adoption friction.
+

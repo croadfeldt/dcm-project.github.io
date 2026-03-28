@@ -1,7 +1,7 @@
 ---
-title: "DCM Operator SDK — API Design"
+title: "DCM Operator SDK API"
 type: docs
-weight: 3
+weight: 4
 ---
 
 
@@ -646,12 +646,26 @@ func (r *ClusterReconciler) Reconcile(
 
 | # | Question | Impact | Status |
 |---|----------|--------|--------|
-| 1 | Should the SDK support non-Go operator frameworks via a language-agnostic REST adapter? | Ecosystem breadth | ❓ Unresolved |
-| 2 | How should the SDK handle DCM endpoint unavailability — queue events locally or drop? | Reliability | ❓ Unresolved |
-| 3 | Should field mappings support dynamic resolution — a transform that queries external data? | Flexibility | ❓ Unresolved |
-| 4 | Should the SDK provide a testing framework for unit testing operator-DCM integration? | Developer experience | ❓ Unresolved |
-| 5 | Should the SDK expose metrics (Prometheus) for DCM registration status, event delivery success, etc.? | Observability | ❓ Unresolved |
+| 1 | Should the SDK support non-Go operator frameworks via a language-agnostic REST adapter? | Ecosystem breadth | ✅ Resolved |
+| 2 | How should the SDK handle DCM endpoint unavailability — queue events locally or drop? | Reliability | ✅ Resolved |
+| 3 | Should field mappings support dynamic resolution — a transform that queries external data? | Flexibility | ✅ Resolved |
+| 4 | Should the SDK provide a testing framework for unit testing operator-DCM integration? | Developer experience | ✅ Resolved |
+| 5 | Should the SDK expose metrics (Prometheus) for DCM registration status, event delivery success, etc.? | Observability | ✅ Resolved |
 
 ---
+
+
+
+## Resolution Notes
+
+**Q1:** No language-agnostic REST adapter is needed in the Go SDK — the Operator Interface Specification is itself language-agnostic. Operators in any language implement the specification directly via HTTP. Community SDKs for Java/Python are encouraged as community projects. The Go SDK is the reference implementation only.
+
+**Q2:** Queue locally, always. The SDK maintains a local durable queue (SQLite — simple, no external dependencies) with configurable capacity and TTL. On DCM reconnection, queued events are replayed in order. If the local queue reaches capacity (DCM unavailable for an extended period), the SDK enters DEGRADED mode: new events are still accepted up to the hard capacity limit, then dropped with a QUEUE_OVERFLOW audit record and an alert via the operator's configured alerting channel. Dropping events silently is never acceptable — the system is designed to be the authoritative source of truth.
+
+**Q3:** Dynamic field resolution is implemented as an Information Provider reference in the field mapping declaration. The SDK declares 'this field resolves from Information Provider X with lookup key Y'. DCM resolves the value during layer assembly via the standard Information Provider query. This keeps transformation logic in DCM's Policy Engine where it belongs and is auditable via standard field provenance.
+
+**Q4:** A mock DCM test harness ships as a first-class component of the SDK. The harness implements the registration, dispatch, cancel, and discover endpoints with configurable behaviors: inject failures, inject delays, return specific payloads, simulate timeout scenarios. Operators use the test harness for unit and integration testing without a live DCM deployment. This is essential for adoption — operators must be able to test DCM integration in CI without a full environment.
+
+**Q5:** Prometheus metrics are mandatory, not optional. The SDK exposes: registration_status (gauge), event_delivery_total (counter, labels: status=success|failure), event_delivery_duration_seconds (histogram), local_queue_depth (gauge, only when local queuing active), dispatch_duration_seconds (histogram), discovery_cycle_duration_seconds (histogram). Metrics endpoint follows the standard DCM observability model and is required for Level 2 conformance.
 
 *Document maintained by the DCM Project. For questions or contributions see [GitHub](https://github.com/dcm-project).*

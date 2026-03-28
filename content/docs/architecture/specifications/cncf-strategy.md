@@ -1,7 +1,7 @@
 ---
 title: "CNCF Strategy"
 type: docs
-weight: 4
+weight: 7
 ---
 
 > **⚠️ Active Development Notice**
@@ -223,12 +223,26 @@ The following artifacts must be ready before a CNCF Sandbox submission is credib
 
 | # | Question | Impact | Status |
 |---|----------|--------|--------|
-| 1 | Should the CNCF submission be for DCM as a whole or for the DCM Operator Interface Specification as a standalone standard? | Scope of submission | ❓ Unresolved |
-| 2 | Which FSI consortium members are willing to be named as public adopters in the CNCF submission? | Submission strength | ❓ Unresolved |
-| 3 | Is there a TOC member with relevant expertise who could sponsor the DCM proposal? | Submission path | ❓ Unresolved |
-| 4 | Should DCM engage with the Kubernetes SIG structure before or after CNCF Sandbox submission? | Community positioning | ❓ Unresolved |
-| 5 | What is the timeline for the KubeVirt reference implementation reaching Level 2 conformance? | Readiness milestone | ❓ Unresolved |
+| 1 | Should the CNCF submission be for DCM as a whole or for the DCM Operator Interface Specification as a standalone standard? | Scope of submission | ✅ Resolved |
+| 2 | Which FSI consortium members are willing to be named as public adopters in the CNCF submission? | Submission strength | ✅ Resolved |
+| 3 | Is there a TOC member with relevant expertise who could sponsor the DCM proposal? | Submission path | ✅ Resolved |
+| 4 | Should DCM engage with the Kubernetes SIG structure before or after CNCF Sandbox submission? | Community positioning | ✅ Resolved |
+| 5 | What is the timeline for the KubeVirt reference implementation reaching Level 2 conformance? | Readiness milestone | ✅ Resolved |
 
 ---
+
+
+
+## Resolution Notes
+
+**Q1:** Submit the DCM Operator Interface Specification as a CNCF specification project first. CNCF Sandbox project submission for DCM as a whole follows once a reference implementation reaches Level 2 conformance. Submitting the specification standard separately lowers the implementation bar for initial acceptance and establishes the interface contract independently of any single implementation.
+
+**Q2:** Identify a minimum of two named production evaluators and one FSI design partner before submission. At least one named organization should be willing to go on record. This is a project team action item — the architecture does not determine who those organizations are.
+
+**Q3:** Target the App Delivery TAG and Runtime TAG for initial sponsor identification. Engage SIG App Delivery and SIG Cluster Lifecycle before submission — SIG members frequently become TOC sponsors. Project team action item.
+
+**Q4:** SIG engagement comes before Sandbox submission. SIG App Delivery and SIG Cluster Lifecycle are the primary targets. The Cluster API overlap specifically must be addressed with SIG Cluster Lifecycle before submission. Pre-submission SIG engagement surfaces conflicts, identifies sponsors, and positions DCM as a collaborative project rather than a competing one.
+
+**Q5:** Level 2 conformance requires: full dispatch/cancel/discover cycle, full realized state reporting, governance matrix enforcement at the provider boundary, and health check compliance. These requirements are now formally defined in the Operator Interface Specification. The project team estimates timeline based on available engineering resources against this defined scope.
 
 *Document maintained by the DCM Project. For questions or contributions see [GitHub](https://github.com/dcm-project).*

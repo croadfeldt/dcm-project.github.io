@@ -3559,7 +3559,7 @@ DRC-001 through DRC-005. Nine control plane components now fully defined in doc 
 
 ---
 
-## SECTION 58 — EXAMPLES AND USE CASES (dcm-examples.md)
+## SECTION 59 — EXAMPLES AND USE CASES (dcm-examples.md)
 
 ### Orchestration Examples (8 scenarios)
 
@@ -3922,7 +3922,44 @@ DRC-001 through DRC-005. Nine control plane components now fully defined in doc 
 
 ---
 
-## SECTION 55 — OPEN QUESTIONS
+## SECTION 55 — COMMUNITY QUESTIONS RESOLVED
+
+All 21 previously open community/implementation questions are now resolved. Key decisions:
+
+### Kubernetes Compatibility (5 resolved)
+- **Namespace → Tenant mapping:** brownfield ingestion model handles pre-existing namespaces; each namespace maps to one DCM Tenant; resources without ownership go to `__transitional__` Tenant
+- **Cluster boundary:** DCM manages across multiple clusters; `Platform.KubernetesCluster` is a resource type DCM provisions, not DCM's own boundary; Tenant is the boundary
+- **Admission webhooks vs Policy Engine:** complementary layers — admission webhooks enforce cluster-native policy, DCM Policy Engine enforces DCM request policy; defense in depth, not duplication
+- **Kubernetes Information Provider:** separately deployed Information Provider following the unified base contract; no built-in providers in DCM
+- **Managed K8s (EKS/GKE/AKS):** managed clusters register as Service Providers of `Platform.ManagedKubernetesCluster`; DCM manages workloads within, not the control plane
+
+### CNCF Strategy (5 resolved)
+- **Submission scope:** Operator Interface Specification as a CNCF specification project first; DCM project submission follows after Level 2 reference implementation
+- **Named adopters:** minimum 2 named evaluators + 1 FSI design partner before submission; project team action item
+- **TOC sponsor:** target App Delivery TAG and Runtime TAG; SIG engagement surfaces sponsors; project team action item
+- **SIG engagement timing:** BEFORE Sandbox submission; SIG App Delivery and SIG Cluster Lifecycle; Cluster API overlap must be addressed pre-submission
+- **Level 2 timeline:** scope is now formally defined (dispatch/cancel/discover + realized state + governance matrix + health check); team estimates timeline against defined scope
+
+### Operator Interface Specification (6 resolved)
+- **CNCF submission:** specification project (not sandbox project requiring implementation); SIG engagement first
+- **Conformance certification:** self-certified via automated test suite (low friction gate) + optional DCM Verified badge via project review
+- **Cluster-scoped resources — two models:** (A) **Cluster as a Service (primary):** Tenant requests and owns an entire `Platform.KubernetesCluster` catalog item; Tenant owns all cluster-scoped resources within that cluster; cluster is the ownership boundary; (B) **Shared cluster infrastructure (exception):** cluster-scoped resources governing shared multi-tenant cluster infrastructure belong to `__platform__` Tenant. Cluster-as-a-Service is the expected primary model — users and Tenant owners request and own clusters through the catalog the same way they request VMs
+- **Non-Go frameworks:** spec is language-agnostic; Go SDK is reference implementation; community Java/Python SDKs encouraged; not maintained by DCM project in v1
+- **Cluster API / Cluster as a Service:** `Platform.KubernetesCluster` is a first-class catalog item — Tenants request and own clusters through the service catalog; CAPI operator or managed K8s service registers as Service Provider; provisioned cluster is a full Tenant-owned entity; it can then register as a nested Service Provider for workload resources (DCM provisions cluster → cluster becomes workload provider → Tenant manages workloads via same DCM catalog); Meta Provider composes compute + network + storage + DNS + credentials
+- **Level 0:** exists — label-based passive discovery, no operator code changes; DCM discovers and tracks but does not control; lowest adoption friction
+
+### Operator SDK (5 resolved)
+- **Language-agnostic adapter:** not needed — spec is language-agnostic; Go SDK is reference only
+- **DCM unavailability:** local durable queue (SQLite); replay on reconnect; DEGRADED mode on overflow with QUEUE_OVERFLOW audit + alert; never drop silently
+- **Dynamic field resolution:** Information Provider reference in field mapping; DCM resolves during layer assembly; keeps logic in Policy Engine with full provenance
+- **Testing framework:** mock DCM test harness ships as first-class SDK component; configurable failure/delay injection; required for Level 2 conformance
+- **Prometheus metrics:** mandatory; 6 standard metrics (registration_status, event_delivery_total, event_delivery_duration, queue_depth, dispatch_duration, discovery_cycle_duration); required for Level 2 conformance
+
+**Zero remaining unresolved architectural questions.** Remaining open items are project team action items (named adopters, TOC sponsor, KubeVirt timeline).
+
+---
+
+## SECTION 56 — PREVIOUSLY OPEN QUESTIONS (NOW CLOSED)
 
 These items are explicitly unresolved. Do not make assumptions about them — flag them and ask for guidance.
 
@@ -4019,7 +4056,7 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
-## SECTION 56 — DOCUMENTATION STRUCTURE
+## SECTION 57 — DOCUMENTATION STRUCTURE
 
 DCM documentation follows a hierarchical structure:
 
@@ -4067,7 +4104,7 @@ content/
 
 ---
 
-## SECTION 57 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 58 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, follow these instructions:
 
