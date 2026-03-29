@@ -5,7 +5,9 @@ weight: 6
 ---
 
 
-> ## ⚠️ Work in Progress — Kubernetes Operator Integration
+> ## 📋 Draft — Promoted from Work in Progress
+>
+> All questions resolved. Cluster-as-a-Service model defined. Namespace-to-Tenant mapping, admission webhook model, and managed K8s integration all specified.
 >
 > **This section is explicitly a work in progress and is less mature than the core DCM data model and architecture documentation.**
 >
@@ -25,7 +27,7 @@ weight: 6
 
 **Document Status:** 🔄 In Progress  
 **Document Type:** Architecture Reference  
-**Related Documents:** [Entity Relationships](../data-model/09-entity-relationships.md) | [Resource Type Hierarchy](../data-model/05-resource-type-hierarchy.md) | [Resource/Service Entities](../data-model/06-resource-service-entities.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md)
+**Related Documents:** [Foundational Abstractions](../data-model/00-foundations.md) | [Entity Relationships](../data-model/09-entity-relationships.md) | [Resource Type Hierarchy](../data-model/05-resource-type-hierarchy.md) | [Resource/Service Entities](../data-model/06-resource-service-entities.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md)
 
 ---
 

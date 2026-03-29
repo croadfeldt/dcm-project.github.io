@@ -50,9 +50,9 @@ Information Providers solve this by giving DCM a standard, stable, governed inte
 
 ---
 
-## 3. The Three Provider Types
+## 3. Information Provider in the Provider Ecosystem
 
-DCM recognizes three provider types. All follow the same base contract model:
+DCM defines eleven provider types, all implementing the unified Provider base contract. This document focuses on the Information Provider type. For the complete provider type list see [A-provider-contract.md](A-provider-contract.md).
 
 | Provider Type | Purpose | Data Direction | DCM Owns Result? |
 |--------------|---------|---------------|-----------------|

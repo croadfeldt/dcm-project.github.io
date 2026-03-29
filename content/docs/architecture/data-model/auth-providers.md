@@ -42,7 +42,9 @@ Every authentication mode DCM supports — static API key, local users, GitHub O
 
 ---
 
-## 2. The Eight Provider Types
+## 2. Auth and Credential Provider Types
+
+Auth Providers and Credential Providers are two of the eleven DCM provider types (see [Unified Provider Contract](A-provider-contract.md)). This section covers the authentication modes and configurations supported:
 
 Auth Provider completes the DCM provider ecosystem:
 
@@ -52,10 +54,13 @@ Auth Provider completes the DCM provider ecosystem:
 | 2 | **Information Provider** | Serves authoritative external data |
 | 3 | **Meta Provider** | Composes multiple providers |
 | 4 | **Storage Provider** | Persists DCM state |
-| 5 | **Policy Provider** | Supplies and evaluates policies |
-| 6 | **Message Bus Provider** | Bridges internal/external event streams |
-| 7 | **Credential Provider** | Resolves secrets from external stores |
-| 8 | **Auth Provider** | Authenticates identities and resolves permissions |
+| 5 | **Policy Provider** | Evaluates policies externally |
+| 6 | **Credential Provider** | Manages secrets and credentials |
+| 7 | **Auth Provider** | Authenticates actor identities |
+| 8 | **Notification Provider** | Delivers notifications |
+| 9 | **Message Bus Provider** | Async event streaming |
+| 10 | **Registry Provider** | Serves the Resource Type Registry |
+| 11 | **Peer DCM** | Another DCM instance (federation) |
 
 ---
 

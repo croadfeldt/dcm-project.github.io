@@ -740,7 +740,7 @@ When a profile is in `proposed` status, all its constituent policies run in shad
 
 ## 4. Policy Providers
 
-### 4.1 The Fifth Provider Type
+### 4.1 Policy Provider (one of eleven DCM provider types)
 
 A **Policy Provider** is a fifth DCM provider type — an external authoritative source that supplies policies directly into DCM or evaluates and enriches DCM data through an external logic engine.
 

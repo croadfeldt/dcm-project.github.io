@@ -1388,7 +1388,7 @@ Layers are merged in precedence order (lowest to highest). For each field:
 The consumer's Request Layer is applied last in the data layer merge. Consumer-declared values override all data layer values. Each override is recorded in provenance.
 
 ### Step 5 — Pre-Placement Policy Processing
-Policies with `placement_phase: pre` (or `both`) are evaluated against the merged payload before any provider is known. Three policy types execute in order:
+Policies matching the `request.layers_assembled` payload type are evaluated against the merged payload before any provider is known. GateKeeper, Transformation, Validation, and Governance Matrix policies may all fire at this stage — evaluated by the Policy Engine in domain precedence order:
 
 1. **Transformation Policies** — enrich and modify the payload. May set `override: constrained` on fields. Each transformation records the policy UUID, operation type, reason, and any override control declarations in provenance.
 2. **Validation Policies** — check the payload against rules. Pass/fail only — no field modification. Failures reject the request.

@@ -7,44 +7,33 @@ weight: 1
 # DCM High Level Design
 
 > **⚠️ Active Development Notice**
-> 
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
-> 
+>
+> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized.
+>
 > Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
+---
 
 ## What is DCM?
 
-DCM (Data Center Management) is an open-source **governing framework** for
-enterprise on-premises and sovereign cloud infrastructure. It provides a
-hyperscaler-like cloud experience — the operational model and self-service
-capabilities of a public cloud provider — on infrastructure that organizations
-own and control.
+DCM (Data Center Management) is an open-source **governing framework** for enterprise on-premises and sovereign cloud infrastructure. It provides a hyperscaler-like cloud experience — the operational model and self-service capabilities of a public cloud provider — on infrastructure that organizations own and control.
 
-DCM is **not a provisioning tool**. It is the management plane that sits above
-provisioning tools, governing what gets requested, approved, built, owned, and
-decommissioned. Provisioning tools (Ansible, Terraform, Kubernetes operators)
-become Service Providers that DCM orchestrates.
+DCM is **not a provisioning tool**. It is the management plane that sits above provisioning tools, governing what gets requested, approved, built, owned, and decommissioned. Provisioning tools (Ansible, Terraform, Kubernetes operators) become Service Providers that DCM orchestrates.
 
-**Mission:** Seamlessly manage the complete lifecycle of all data center
-infrastructure by providing a policy-governed, data-driven, and unified platform
-to enable and ensure sovereignty.
+**Mission:** Seamlessly manage the complete lifecycle of all data center infrastructure by providing a policy-governed, data-driven, and unified platform to enable and ensure sovereignty.
 
 ---
 
 ## The Problem DCM Solves
 
-Enterprise organizations managing private cloud infrastructure face consistent
-challenges that public cloud providers have already solved — and that DCM brings
-to on-premises:
-
 | Challenge | DCM Response |
 |-----------|-------------|
 | **Fragmented operations** — disparate tools, no unified control | Single control plane — one API, one data model, one policy engine |
 | **No source of truth** — multiple CMDBs diverge | Four-state model provides authoritative record of intent, request, realized, and discovered state |
-| **High time-to-market** — a VM may require dozens of teams | Self-service catalog with policy-governed automation |
-| **Drift and state discrepancy** — no reconciliation between intended and actual | Continuous drift detection comparing realized vs discovered state |
-| **Sovereignty requirements** — data residency, compliance, audit evidence | Policy Engine with sovereignty enforcement, complete provenance chain |
+| **High time-to-market** — provisioning a VM may require dozens of teams | Self-service catalog with policy-governed automation — any authorized actor can request any service |
+| **Drift and state discrepancy** — no reconciliation between intended and actual | Continuous drift detection comparing realized vs discovered state with automated or human-directed remediation |
+| **Sovereignty requirements** — data residency, compliance, audit evidence | Unified Governance Matrix with sovereignty zone enforcement, complete provenance chain, and accreditation management |
+| **Siloed governance** — platform admins bottleneck policy changes | Federated contribution model — consumers, providers, and peer DCMs all contribute within their permitted scope |
 
 ---
 
@@ -54,226 +43,245 @@ to on-premises:
 |-----------|---------|
 | **Declarative** | Data describes what should exist, not how to achieve it |
 | **API-First** | Every capability is available via a standard API |
-| **Policy-Governed** | All business logic flows through the Policy Engine — not hard-coded |
+| **Policy-Governed** | All business logic flows through the Policy Engine — never hard-coded |
 | **Idempotent** | Applying the same data multiple times always produces the same result |
 | **Immutable if Versioned** | Published versions never change — changes produce new versions |
 | **Provider-Agnostic** | DCM defines contracts, not implementations |
-| **GitOps-Native** | Intent and Requested state are Git-native — branched, reviewed, versioned |
-| **Kubernetes Superset** | DCM extends Kubernetes upward — operators become DCM Service Providers |
+| **GitOps-Native** | Intent and policy artifacts are Git-native — branched, reviewed, versioned |
+| **Federated by Default** | All authorized actor types contribute data within their permitted scope |
+| **AI-Ready** | Standalone architecture designed with AIOps layering in mind |
 
 ---
 
-## Architecture Overview
+## The Three Foundational Abstractions
 
-DCM consists of four major architectural layers:
+Every concept in DCM maps to one of three foundational abstractions. There is no fourth.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    CONSUMER INGRESS                          │
-│         Web UI  │  Consumer API  │  Direct API (3rd Rail)   │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                    CONTROL PLANE                             │
-│                                                              │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐ │
-│  │ Service     │  │  Request     │  │   Policy Engine    │ │
-│  │ Catalog     │  │  Payload     │  │                    │ │
-│  │             │  │  Processor   │  │  Transformation    │ │
-│  └─────────────┘  └──────────────┘  │  Validation        │ │
-│                                      │  GateKeeper        │ │
-│  ┌─────────────┐  ┌──────────────┐  └────────────────────┘ │
-│  │ IDM / IAM   │  │  Audit &     │                          │
-│  │             │  │  Observ.     │  ┌────────────────────┐ │
-│  └─────────────┘  └──────────────┘  │   API Gateway      │ │
-│                                      └────────────────────┘ │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                      PROVIDERS                               │
-│                                                              │
-│  Service Providers   │  Information Providers               │
-│  Meta Providers      │  Storage Providers                   │
-│                                                              │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐  │
-│  │ KubeVirt │ │ VMware   │ │ OpenStack│ │ HR / Finance │  │
-│  │ AAP      │ │ Bare     │ │ CAPI     │ │ CMDB / ITSM  │  │
-│  │ CloudNPG │ │ Metal    │ │ Storage  │ │ Custom       │  │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                          DATA                                    │
+│  Everything that exists, is stored, has a lifecycle.            │
+│  Entities, layers, policies, accreditations, audit records,     │
+│  groups, relationships — all Data.                              │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ flows through
+              ┌────────────┴────────────┐
+              ▼                         ▼
+┌─────────────────────┐   ┌─────────────────────────────────────┐
+│      PROVIDER        │   │              POLICY                  │
+│  Every external      │   │  Every rule that fires on Data,      │
+│  component DCM       │   │  decides what happens, transforms    │
+│  calls or that       │   │  values, or enforces constraints.    │
+│  calls DCM.          │   │  Seven typed output schemas.         │
+│  Eleven typed        │   │  One evaluation algorithm.           │
+│  capability          │   │  Same lifecycle for all.             │
+│  extensions.         │   │                                      │
+│  One base contract.  │   │                                      │
+└─────────────────────┘   └─────────────────────────────────────┘
 ```
+
+**The runtime loop:**
+```
+Event (Data state change)
+  → Policy Engine evaluates all matching Policies
+  → Policies produce decisions / mutations / actions
+  → Actions invoke Providers or produce new Data
+  → New Data triggers new Events → repeat
+```
+
+See [Foundational Abstractions](data-model/foundations/) for the complete model.
 
 ---
 
 ## The Four States
 
-Every resource in DCM exists across four independently maintained state records:
+Every resource entity in DCM has four independently maintained lifecycle stages stored in specialized stores:
 
-| State | Question | Store |
-|-------|----------|-------|
-| **Intent** | What did the consumer ask for? | GitOps — immutable, branched, PR reviewed |
-| **Requested** | What was approved and dispatched? | GitOps — assembled, policy-processed, full provenance |
-| **Realized** | What did the provider actually build? | Event Stream — append-only, entity-keyed |
-| **Discovered** | What actually exists right now? | Event Stream — ground truth for drift detection |
+| State | What it records | Store |
+|-------|----------------|-------|
+| **Intent** | What did the consumer declare? | GitOps — immutable, PR-reviewed |
+| **Requested** | What was assembled, validated, and dispatched? | Write-once snapshot — full provenance |
+| **Realized** | What did the provider confirm it built? | Snapshot store — append-only |
+| **Discovered** | What actually exists right now, independently observed? | Ephemeral stream — ground truth for drift |
 
-The **entity UUID** is the universal linking key — assigned at Intent State creation, it links the entity across all four states and all stores throughout its entire lifecycle.
-
----
-
-## The Data Model
-
-The DCM Data Model is the foundational layer that governs how all data is
-represented, versioned, assembled, and governed. Key concepts:
-
-**Data Layers** assemble a complete request payload from composable, versioned
-units of configuration. 36 layer definitions can govern 40,000 VMs without
-duplication. Layers are organized by Domain (system, platform, tenant, service,
-provider), identified by a human-readable Handle, and ordered by a hierarchical
-Priority Schema for deterministic conflict resolution.
-
-**Resource Types** are portable, vendor-neutral definitions of resource classes.
-They live in the DCM Resource Type Registry alongside Information Types
-(Business.*, Identity.*, Compliance.*) — same registry, different category prefix.
-
-**Entity Relationships** use a universal bidirectional model for all connections
-between entities — whether VM-to-Storage, Application-to-WebServer, or
-Resource-to-BusinessUnit. One model, all relationships.
-
-**Field Override Control** uses a graduated three-level model: no declaration
-(allow by default), simple `override: immutable`, or a full actor-permission
-matrix. The Policy Engine is the sole authority for setting override control.
-
-**Artifact Metadata** is universal — every layer, policy, resource type, catalog
-item, and provider registration carries a standard metadata block with creator,
-owner, modification history, and contact information.
+The **entity UUID** links the entity across all four states throughout its entire lifecycle.
 
 ---
 
 ## Provider Model
 
-DCM defines **contracts**, not implementations. Four provider types:
+DCM defines contracts, not implementations. Eleven provider types all implement the **unified Provider base contract** (registration, health, sovereignty, accreditation, governance matrix enforcement, zero trust). What varies is the capability extension.
 
-| Type | Purpose |
-|------|---------|
-| **Service Provider** | Realizes resources — KubeVirt, VMware, Ansible, Terraform |
-| **Information Provider** | Serves authoritative external data DCM references but does not own |
-| **Meta Provider** | Composes multiple providers into higher-order services |
-| **Storage Provider** | Persists DCM state — GitOps stores, event streams, audit store |
+| Provider Type | Capability |
+|--------------|-----------|
+| **Service Provider** | Realizes infrastructure resources (VMs, networks, storage, containers) |
+| **Information Provider** | Serves authoritative external data (CMDB, HR, Finance) |
+| **Storage Provider** | Persists DCM state (GitOps stores, event streams, audit) |
+| **Meta Provider** | Composes multiple providers into compound services |
+| **Policy Provider** | Evaluates policies externally (OPA sidecar, Mode 1–4) |
+| **Credential Provider** | Issues and rotates secrets and credentials |
+| **Auth Provider** | Authenticates actor identities |
+| **Notification Provider** | Delivers notifications via configured channels |
+| **Message Bus Provider** | Async event streaming |
+| **Registry Provider** | Serves the Resource Type Registry |
+| **Peer DCM** | Another DCM instance — federation is the Provider abstraction applied across instances |
 
-All providers follow the same registration, health check, trust, and contract model.
-
----
-
-## Policy Engine
-
-The Policy Engine is the single authoritative logic gate for all business rules.
-Three policy types in execution order:
-
-1. **Transformation** — enriches and modifies the payload; may set field constraints
-2. **Validation** — checks payload against rules; pass/fail, no modification
-3. **GateKeeper** — highest authority; can override any field; enforces sovereignty
-
-Policies follow a three-tier hierarchy: Global → Tenant → User. A Global policy
-cannot be overridden by Tenant or User policies. The Policy Engine uses OPA/Rego
-for policy implementation.
-
-Policies support five statuses: **developing** (dev mode only), **proposed**
-(shadow execution — output captured but not applied, for validation),
-**active**, **deprecated**, and **retired**.
+See [Unified Provider Contract](data-model/provider-contract/) for the base contract and all capability extensions.
 
 ---
 
-## Kubernetes as a Superset
+## Policy Model
 
-DCM is designed as a **superset of Kubernetes** — extending Kubernetes' declarative
-model upward to the management plane:
+Policies are the orchestration in DCM. Seven typed output schemas, one base contract, one evaluation algorithm.
 
-| Kubernetes | DCM |
-|-----------|-----|
-| Single cluster | Multi-cluster, multi-infrastructure |
-| Namespace isolation | First-class Tenant ownership model |
-| RBAC + admission webhooks | Policy Engine with field-level override control |
-| No cost attribution | Full lifecycle cost analysis |
-| No cross-cluster management | Unified management plane |
+| Policy Type | Output | Fires on |
+|-------------|--------|---------|
+| **GateKeeper** | allow / deny | Request payload |
+| **Validation** | pass / fail + field detail | Request payload |
+| **Transformation** | field mutations | Request payload |
+| **Recovery** | action + parameters | Failure/timeout trigger |
+| **Orchestration Flow** | step sequence | Pipeline events (named workflows) |
+| **Governance Matrix Rule** | ALLOW / DENY / STRIP_FIELD / REDACT | Any cross-boundary interaction |
+| **Lifecycle Policy** | action on related entity | Relationship events |
 
-Kubernetes operators become DCM Service Providers through the
-[DCM Operator Interface Specification](specifications/operator-interface-spec/).
-The [DCM Operator SDK](specifications/operator-sdk-api/) enables Level 1 conformance
-in one day.
+**Two-level orchestration:**
+- **Level 1 — Named Workflow Artifacts:** Orchestration Flow Policy with `ordered: true` — explicit, visible, auditable step sequence. This is the named pipeline skeleton.
+- **Level 2 — Dynamic Policies:** GateKeeper, Transformation, Recovery policies fire when conditions match, alongside workflow steps, without being declared in the workflow.
+
+Both levels are evaluated by the same Policy Engine through the same event bus. See [Unified Policy Contract](data-model/policy-contract/).
 
 ---
 
-## Digital Sovereignty
+## Unified Governance Matrix
 
-DCM addresses four sovereignty dimensions:
+The Governance Matrix is the single enforcement point for all cross-boundary data and capability decisions. It governs every interaction between DCM and any provider, peer DCM, or external endpoint.
 
-| Dimension | DCM Enabler |
-|-----------|-------------|
-| **Data and Content Sovereignty** | Data Model, Policy Engine, Validated Providers |
-| **Operational Sovereignty** | Policy Engine — Sovereign Execution Posture |
-| **Security and Compliance** | Audit, GRC, complete provenance chain |
-| **Mobility and Placement** | Policy Engine placement constraints, provider portability |
+**Four axes per rule:** Subject (who) · Data (what — including field-level paths) · Target (where — sovereignty zone, jurisdiction, accreditation) · Context (profile, zero trust posture, TLS state)
 
-**Sovereign Execution Posture** — the target end state where all operations are
-governed, auditable, and compliant with sovereignty requirements. This is the
-north star concept of DCM.
+**Decision vocabulary:** ALLOW · DENY · ALLOW_WITH_CONDITIONS · STRIP_FIELD · REDACT · AUDIT_ONLY
+
+**Hard vs soft enforcement:** Hard rules cannot be relaxed by any downstream rule. `sovereign` and `classified` data never crossing any boundary is always hard.
+
+**Profile-bound defaults:** Each profile activates a set of default matrix rules. Organizations tighten (never relax) with Tenant and resource-type overrides.
+
+See [Unified Governance Matrix](data-model/governance-matrix/).
+
+---
+
+## Federated Contribution Model
+
+DCM defaults to a federated model for data creation. Every authorized actor type can contribute Data artifacts within their permitted scope — all via the same GitOps PR model with profile-governed review.
+
+| Contributor | Can contribute |
+|-------------|---------------|
+| **Platform Admin** | All artifact types at all domains |
+| **Consumer / Tenant** | Tenant-domain policies, resource groups, notification subscriptions, service definitions |
+| **Service Provider** | Resource Type Specs (their types), catalog items, service layers, provider policies |
+| **Peer DCM** | Registry entries, policy templates, service layers (scoped by federation trust posture) |
+
+Contributor scope is enforced by the Governance Matrix as a hard DENY — a consumer cannot contribute system-domain policies regardless of what they declare.
+
+See [Federated Contribution Model](data-model/federated-contribution-model/).
+
+---
+
+## Control Plane Components
+
+Nine internal components implement the three abstractions at runtime:
+
+| Component | Role |
+|-----------|------|
+| **Request Orchestrator** | Event bus — no pipeline logic; policies define all behavior |
+| **Policy Engine** | Evaluates all policy types using the same algorithm |
+| **Placement Engine** | Six-step provider selection (sovereignty → accreditation → capability → reserve query → tie-breaking → confirm) |
+| **Cost Analysis** | Pre-request estimation and ongoing attribution |
+| **Lifecycle Constraint Enforcer** | Monitors TTL/expiry; fires expiry actions through the standard pipeline |
+| **Discovery Scheduler** | Schedules and dispatches discovery requests to Service Providers |
+| **Notification Router** | Resolves notification audiences from the relationship graph |
+| **Drift Reconciliation** | Compares Discovered vs Realized state; produces drift records; never writes to Realized Store |
+| **Search Index** | Non-authoritative queryable projection of GitOps stores; always rebuildable |
+
+---
+
+## Zero Trust and Security
+
+DCM operates on a network-position-grants-zero-trust model. Every interaction boundary applies five checks regardless of the caller's network location:
+
+```
+Identity verification (mTLS)
+  → Authorization verification (scoped credential)
+    → Accreditation check (does the target hold required certs?)
+      → Governance Matrix check (are the fields permitted to cross?)
+        → Sovereignty check (does the endpoint satisfy constraints?)
+```
+
+All five checks produce audit records regardless of outcome. Profile-governed zero trust posture: none (minimal) → boundary (dev/standard) → full (prod/fsi) → hardware_attested (sovereign).
 
 ---
 
 ## Request Lifecycle
 
-A complete request lifecycle from consumer intent to realized resource:
+A complete path from consumer intent to realized resource:
 
 ```
-Consumer submits request
+Consumer submits request (API, Web UI, or Git PR)
   │
-  ▼  [Git branch created — CI pipeline fires]
-Intent State captured (immutable consumer declaration)
-  │  CI: policy pre-validation, cost estimate, sovereignty check
-  │  Human review via PR (if policy requires)
-  ▼  [PR merged — CD pipeline fires]
-Request Payload Processor — Nine-Step Assembly
+  ▼ Intent State captured — versioned GitOps artifact
+  │ Policy pre-validation (shadow mode); cost estimate; sovereignty check
   │
-  │  Steps 1-4: Layer assembly
-  │    Base → Core → Intermediate → Service → Request Layer
+  ▼ Request Payload Processor:
+  │   1–4: Layer assembly (Base → Core → Service → Request Layer)
+  │   5:   Pre-placement policies (Transformation, Validation, GateKeeper)
+  │   6:   Placement Engine — sovereignty filter → accreditation filter →
+  │         capability filter → parallel reserve queries → tie-breaking →
+  │         confirm selection
+  │   7:   Post-placement policies (provider-aware enrichment)
+  │   8:   Requested State written to write-once store (full provenance)
+  │   9:   Provider dispatch
   │
-  │  Step 5: Pre-Placement Policies
-  │    Transformation → Validation → GateKeeper
-  │    Outputs: placement constraints
+  ▼ Service Provider:
+  │   Naturalize (DCM format → provider native)
+  │   Execute (provision the resource)
+  │   Denaturalize (provider native → DCM unified format)
+  │   Return Realized State
   │
-  │  Step 6: Placement Engine — Placement Loop
-  │    For each candidate provider:
-  │      Reserve Query (atomic: verify + metadata + hold)
-  │      Loop Policy Phase (evaluates reserve query response)
-  │        pass → Placement confirmed
-  │        reject_candidate → next candidate
-  │        gatekeep → request rejected
+  ▼ Realized State written — confirmed by provider
   │
-  │  Step 7: Post-Placement Policies
-  │    Transformation → Validation → GateKeeper
-  │    Provider-aware enrichment and validation
-  │
-  ▼
-Requested State committed to Git (full provenance chain)
-  │  Includes: placement block, hold records, policy gap records
-  ▼
-Provider dispatch via API Gateway (hold confirmed)
-  │  Naturalization: DCM format → provider native format
-  │  Provider realizes resource, returns full metadata
-  │  Denaturalization: provider native → DCM format
-  ▼
-Realized State (event stream, provider-confirmed)
-  │  enrichment_status updated as metadata arrives
-  ▼  [Continuous]
-Drift Detection: Discovered State vs Realized State
-  │  Unsanctioned changes → Policy Engine response
-  │  Drift → REVERT | UPDATE | ALERT | ESCALATE
+  ▼ Continuous discovery → Drift Reconciliation
+      Discovered State vs Realized State
+      Drift: field-level detail, severity classification, unsanctioned detection
+      Response: REVERT | ACCEPT_DRIFT | NOTIFY_AND_WAIT | ESCALATE
 ```
+
+---
+
+## Capabilities Summary
+
+126 capabilities across 20 domains. Full detail in the [Capabilities Matrix](../capabilities-matrix/).
+
+**Minimum viable end-to-end set (21 capabilities):**
+IAM-001 → IAM-002 → IAM-003 → IAM-007 → CAT-001 → REQ-001 → REQ-002 → REQ-003 → REQ-004 → REQ-005 → REQ-006 → REQ-007 → PRV-001 → PRV-002 → PRV-003 → PRV-004 → PRV-005 → LCM-001 → DRF-001 → DRF-002 → AUD-001
+
+---
+
+## APIs and Interfaces
+
+| Interface | Purpose |
+|-----------|---------|
+| **Consumer API** | Service catalog, request submission, resource management, drift, groups, notifications, cost, quota, contribution endpoints |
+| **Admin API** | Tenant management, provider review, accreditation approval, discovery triggers, orphan resolution, quota, Search Index management |
+| **Operator Interface** | What Service Providers implement — dispatch, cancel, discover, health |
+| **Flow GUI** | Visual policy composer — execution graph, canvas, simulation, shadow mode, authoring |
+| **Flow GUI API** | Backend serving the Flow GUI — graph data, simulation, shadow promotion, canvas PR creation |
 
 ---
 
 ## Related Documents
 
-- [Data Model](data-model/) — Complete data model documentation including the Ingestion Model for V1 migration and brownfield ingestion
-- [Specifications](specifications/) — Operator Interface Specification, Kubernetes compatibility, SDK API, CNCF strategy
-- [Enhancements](../enhancements/) — Enhancement proposals for the DCM project
+- **[Foundational Abstractions](data-model/foundations/)** — Data, Provider, Policy — read this first
+- **[Unified Provider Contract](data-model/provider-contract/)** — base contract + 11 typed extensions
+- **[Unified Policy Contract](data-model/policy-contract/)** — base contract + 7 output schemas
+- **[Federated Contribution Model](data-model/federated-contribution-model/)** — who contributes what and how
+- **[Data Model](data-model/)** — complete 28-document data model reference
+- **[Specifications](specifications/)** — Consumer API, Admin API, Operator Interface, OPA Integration, Flow GUI, Registration, Examples, Kubernetes compatibility, SDK, CNCF strategy
+- **[Capabilities Matrix](../capabilities-matrix/)** — 126 capabilities across 20 domains

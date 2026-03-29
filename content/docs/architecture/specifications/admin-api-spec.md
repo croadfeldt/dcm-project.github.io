@@ -13,7 +13,7 @@ weight: 1
 **Version:** 0.1.0-draft
 **Status:** Draft — Ready for implementation feedback
 **Document Type:** Technical Specification
-**Related Documents:** [Consumer API Specification](consumer-api-spec.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md) | [Control Plane Components](../data-model/25-control-plane-components.md) | [Accreditation and Authorization Matrix](../data-model/26-accreditation-and-authorization-matrix.md)
+**Related Documents:** [Foundational Abstractions](../data-model/00-foundations.md) | [Consumer API Specification](consumer-api-spec.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md) | [Control Plane Components](../data-model/25-control-plane-components.md) | [Accreditation and Authorization Matrix](../data-model/26-accreditation-and-authorization-matrix.md)
 
 ---
 

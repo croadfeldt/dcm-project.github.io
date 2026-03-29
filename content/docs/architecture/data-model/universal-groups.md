@@ -1,5 +1,5 @@
 ---
-title: "Universal Group Model"
+title: "DCM Data Model — Universal Group Model"
 type: docs
 weight: 15
 ---

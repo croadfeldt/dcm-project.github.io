@@ -1,5 +1,5 @@
 ---
-title: "Federated Contribution Model"
+title: "DCM Data Model — Federated Contribution Model"
 type: docs
 weight: 28
 ---

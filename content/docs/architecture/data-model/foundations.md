@@ -1,5 +1,5 @@
 ---
-title: "DCM Foundational Abstractions"
+title: "DCM — Foundational Abstractions"
 type: docs
 weight: 0
 ---
@@ -224,7 +224,7 @@ The Request Orchestrator and Policy Engine are the runtime that connects the thr
 - Static flows: Orchestration Flow Policies with `ordered: true`
 - Dynamic flows: conditional Policies that fire based on payload state
 
-**Control plane components as runtime specializations:**
+**Control plane components as runtime specializations (nine total):**
 
 The components in [Control Plane Components](25-control-plane-components.md) are specialized runtime implementations, not separate abstractions:
 

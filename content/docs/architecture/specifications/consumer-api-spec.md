@@ -11,7 +11,7 @@ weight: 0
 **Version:** 0.1.0-draft
 **Status:** Draft — Ready for implementation feedback
 **Document Type:** Technical Specification
-**Related Documents:** [DCM Operator Interface Specification](dcm-operator-interface-spec.md) | [Four States](../data-model/02-four-states.md) | [Auth Providers](../data-model/19-auth-providers.md) | [Webhooks and Messaging](../data-model/18-webhooks-messaging.md)
+**Related Documents:** [Foundational Abstractions](../data-model/00-foundations.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md) | [Four States](../data-model/02-four-states.md) | [Auth Providers](../data-model/19-auth-providers.md) | [Webhooks and Messaging](../data-model/18-webhooks-messaging.md)
 
 ---
 

@@ -38,7 +38,9 @@ This is consistent with DCM's governing framework philosophy: DCM does not presc
 
 ---
 
-## 2. The Four Provider Types
+## 2. Storage Provider Sub-Types
+
+Storage Providers are one of eleven DCM provider types (see [Unified Provider Contract](A-provider-contract.md)). Within the Storage Provider type, four storage sub-types are defined, each optimized for different access patterns and consistency requirements:
 
 | Provider Type | Purpose | Data Direction | DCM Owns Result? |
 |--------------|---------|---------------|-----------------|

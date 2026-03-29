@@ -5,7 +5,9 @@ weight: 2
 ---
 
 
-> ## ⚠️ Work in Progress — Kubernetes Operator Integration
+> ## 📋 Draft — Promoted from Work in Progress
+>
+> All questions resolved. Level 0–4 conformance levels defined. Cluster-scoped resource ownership clarified. CAPI integration specified.
 >
 > **This section is explicitly a work in progress and is less mature than the core DCM data model and architecture documentation.**
 >
@@ -24,7 +26,7 @@ weight: 2
 
 
 **Version:** 0.1.0-draft  
-**Status:** Draft — Not yet ratified  
+**Status:** Draft — Ready for implementation feedback
 **Document Type:** Technical Specification  
 **Maintainers:** Red Hat FlightPath Team  
 **GitHub:** https://github.com/dcm-project  
@@ -37,6 +39,8 @@ weight: 2
 This specification defines the interface by which Kubernetes operators integrate with the DCM (Data Center Management) control plane as first-class Service Providers. An operator that conforms to this specification becomes a DCM Service Provider, enabling its managed resources to participate in DCM's unified lifecycle management, multi-tenancy, policy governance, cost analysis, drift detection, and service catalog.
 
 DCM is designed as a superset of Kubernetes — extending Kubernetes' declarative, controller-based model upward to provide unified management across multiple clusters, infrastructure types, and organizational boundaries. This specification is the technical contract that enables that extension without requiring operators to abandon their existing Kubernetes-native design.
+
+Operators conforming to this specification function as Service Providers within a single DCM instance. In federated deployments (Hub-Spoke or Peer topology), the operator registers with the appropriate Regional or local DCM instance — federation routing is handled by DCM, not by the operator.
 
 ---
 
@@ -1047,7 +1051,7 @@ Operators must monitor for changes to DCM-managed CRs that did not originate fro
 
 **Q3:** Two distinct models apply, and it is important to not conflate them:
 
-**Model A — Cluster as a Service (the primary model):** A Kubernetes cluster is a catalog item that any authorized Tenant can request and own. The Tenant owns the entire cluster entity — including all cluster-scoped resources within it (ClusterRoles, StorageClasses, PersistentVolumes, etc.) — because the cluster itself is the resource boundary. The `Platform.KubernetesCluster` catalog item is provisioned by a Cluster-as-a-Service Provider (e.g., a CAPI-backed operator). Once provisioned, the cluster is a Resource Entity owned by the requesting Tenant. Everything within that cluster is scoped to that Tenant's ownership. This is the primary model — users and Tenant owners fully expect to request and own clusters as a service through the catalog.
+**Model A — Cluster as a catalog item (example Service Provider implementation):** A Kubernetes cluster can be offered as a catalog item that any authorized Tenant requests and owns — this is a natural use of DCM's Service Provider model, not a special architectural feature. From DCM's perspective, `Platform.KubernetesCluster` is simply a resource type whose Service Provider happens to provision Kubernetes clusters (e.g., via CAPI). The Tenant owns the resulting cluster entity, including all cluster-scoped resources within it, because the cluster is the resource boundary. This is an example of how DCM's architecture enables complex resources as services — DCM has no special knowledge of Kubernetes; it treats the cluster as any other resource entity.
 
 **Model B — Shared cluster infrastructure (the exception):** When multiple Tenants share a single cluster (the multi-tenant cluster model), cluster-scoped resources that govern the shared infrastructure itself (admission webhook configurations, cluster-level network policies, CRD registrations) cannot be owned by any single Tenant — they belong to the `__platform__` system Tenant. These are resources that, if modified by a Tenant, would affect all other Tenants on the cluster. The distinction: resources *inside* a Tenant-owned cluster are always Tenant-owned; resources that *govern shared cluster infrastructure* belong to `__platform__`.
 

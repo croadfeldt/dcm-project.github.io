@@ -6,14 +6,14 @@ weight: 3
 
 > **📋 Draft**
 >
-> This specification has been promoted from Work in Progress to Draft status. All questions resolved. Complete registration pipeline for all 9 provider types with full capability declaration schemas and federation trust model. It is ready for implementation feedback but has not yet been formally reviewed for final release.
+> This specification has been promoted from Work in Progress to Draft status. All questions resolved. Complete registration pipeline for all 11 provider types with full capability declaration schemas and federation trust model. It is ready for implementation feedback but has not yet been formally reviewed for final release.
 >
 > This specification defines the unified registration flow for all DCM provider types. Published to share design direction and invite feedback.
 
 **Version:** 0.1.0-draft
 **Status:** Draft — Ready for implementation feedback
 **Document Type:** Technical Specification
-**Related Documents:** [Control Plane Components](../data-model/25-control-plane-components.md) | [Governance Matrix](../data-model/27-governance-matrix.md) | [Accreditation and Authorization Matrix](../data-model/26-accreditation-and-authorization-matrix.md) | [Policy Profiles](../data-model/14-policy-profiles.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md)
+**Related Documents:** [Foundational Abstractions](../data-model/00-foundations.md) | [Control Plane Components](../data-model/25-control-plane-components.md) | [Governance Matrix](../data-model/27-governance-matrix.md) | [Accreditation and Authorization Matrix](../data-model/26-accreditation-and-authorization-matrix.md) | [Policy Profiles](../data-model/14-policy-profiles.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md)
 
 ---
 
@@ -31,7 +31,7 @@ The Provider Type Registry is the authoritative list of provider types that a DC
 
 | Tier | Maintained By | Examples |
 |------|--------------|---------|
-| **Core** | DCM Project | The nine built-in provider types |
+| **Core** | DCM Project | The eleven built-in provider types |
 | **Verified Community** | Named community maintainers | Domain-specific provider types |
 | **Organization** | Deploying organization | Custom/proprietary integrations |
 
@@ -78,7 +78,7 @@ provider_type_registry_entry:
     failure_threshold: 3                       # failures before degraded status
 ```
 
-### 1.3 The Nine Core Provider Types
+### 1.3 The Eleven Core Provider Types
 
 | # | provider_type_id | Default Approval | Enabled In |
 |---|-----------------|-----------------|------------|

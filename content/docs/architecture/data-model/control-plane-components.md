@@ -30,6 +30,9 @@ weight: 25
 
 ---
 
+
+The DCM Control Plane consists of **nine components** that implement the three foundational abstractions at runtime.
+
 ## 1. Purpose
 
 This document formally defines the DCM control plane components that are referenced throughout the data model documents but not previously specified in detail. Two components are defined here:

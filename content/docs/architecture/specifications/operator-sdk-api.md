@@ -5,7 +5,9 @@ weight: 4
 ---
 
 
-> ## ⚠️ Work in Progress — Kubernetes Operator Integration
+> ## 📋 Draft — Promoted from Work in Progress
+>
+> All questions resolved. Local durable queue, mock test harness, Prometheus metrics, and dynamic field resolution all specified.
 >
 > **This section is explicitly a work in progress and is less mature than the core DCM data model and architecture documentation.**
 >
@@ -28,7 +30,7 @@ weight: 4
 **Document Type:** Technical Design  
 **Language:** Go  
 **Repository:** https://github.com/dcm-project/operator-sdk  
-**Related Documents:** [DCM Operator Interface Specification](dcm-operator-interface-spec.md) | [Kubernetes Compatibility](11-kubernetes-compatibility.md)
+**Related Documents:** [Foundational Abstractions](../data-model/00-foundations.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md) | [Kubernetes Compatibility](11-kubernetes-compatibility.md)
 
 ---
 

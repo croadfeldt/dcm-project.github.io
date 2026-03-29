@@ -13,7 +13,7 @@ weight: 5
 **Version:** 0.1.0-draft
 **Status:** Draft — Ready for implementation feedback
 **Document Type:** Technical Specification
-**Related Documents:** [Policy Profiles](../data-model/14-policy-profiles.md) | [Control Plane Components](../data-model/25-control-plane-components.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md)
+**Related Documents:** [Foundational Abstractions](../data-model/00-foundations.md) | [Policy Profiles](../data-model/14-policy-profiles.md) | [Control Plane Components](../data-model/25-control-plane-components.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md)
 
 ---
 
