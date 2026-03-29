@@ -114,6 +114,18 @@ The DCM taxonomy defines the precise vocabulary used throughout the architecture
 
 
 
+
+### API Versioning Terms
+
+| Term | Definition |
+|------|-----------|
+| **Breaking Change** | Any change that requires an existing client to modify code or configuration to continue working. Removing fields, changing types, removing endpoints, tightening validation, changing HTTP status semantics. See [34-api-versioning-strategy.md] Section 2 for the complete definition. |
+| **Deprecation Period** | The window between when a version is announced as deprecated and when it reaches its sunset date. Deprecated versions continue to function; responses include `Deprecation` and `Sunset` headers. Profile-governed: prod=365 days notice, 2 years support; sovereign=2 years notice, 4 years support. |
+| **Sunset Date** | The date after which a deprecated API version returns `410 Gone`. Clients must migrate before this date. |
+| **Preview Endpoint** | An endpoint at `/api/v{N}/preview/` path with no stability commitment. May change or be removed without a major version increment. Not for production use. |
+| **VER-001–VER-009** | API Versioning system policies. Key: VER-002 (breaking change definition — when in doubt, treat as breaking), VER-003 (deprecation headers required on all deprecated version responses), VER-005 (support windows are profile-governed), VER-008 (machine-readable migration guide required for each new major version). |
+
+
 ### Event Catalog Terms
 
 | Term | Definition |
@@ -253,6 +265,7 @@ Terms to avoid because they introduce ambiguity. Use the precise alternatives in
 | DPO | Design Priority Order |
 | ATM | Authority Tier Model |
 | EVT | Event Catalog |
+| VER | API Versioning |
 
 ---
 

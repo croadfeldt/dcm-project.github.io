@@ -4138,30 +4138,25 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ---
 
-## SECTION 59 — CAPABILITIES MATRIX UPDATE (119 capabilities, 19 domains)
+## SECTION 59 — CAPABILITIES MATRIX (167 capabilities, 26 domains)
 
-Five new domains added to the capabilities matrix. Total: 126 capabilities across 20 domains.
+The DCM Capabilities Matrix contains 167 capabilities across 26 domains. Each capability row specifies what consumers, service providers, and platform admins can do, along with dependencies.
 
-**New domains:**
+**Current domain count: 26**
+IAM, CAT, REQ, PRV, LCM, DRF, POL, LAY, INF, ING, AUD, OBS, STO, FED, GOV, ACC, ZTS, GMX, DRC, FCM, SMX, MPX, CPX, DPO, ATM, EVT, VER (26 domain prefixes; see taxonomy for full names)
 
-**16. Accreditation Management (ACC-001–006):** Accreditation submission and approval, lifecycle monitoring with P90D renewal warnings, gap response via Recovery Policy, data classification enforcement at interaction boundaries, DCM deployment-level accreditation for federation trust.
+**Recent additions (docs 29–34):**
+- SMX (Scoring Model, doc 29): risk scoring, approval routing, signal weights, governance matrix
+- MPX (Meta Provider, doc 30): compound service definition, constituent orchestration via dependency graph
+- CPX (Credential Provider, doc 31): credential lifecycle, rotation, revocation, profile-governed security
+- ATM (Authority Tier, doc 32): dynamic ordered tier list, custom tiers, degradation gate, impact detection
+- EVT (Event Catalog, doc 33): 82 event types, base envelope, payload schemas, EVT-001–007
+- VER (API Versioning, doc 34): breaking change definition, deprecation lifecycle, version discovery
 
-**17. Zero Trust and Security Posture (ZTS-001–006):** mTLS enforcement, scoped short-lived interaction credentials, certificate rotation management (P14D warning, P7D transition window), zero_trust_posture profile configuration (none/boundary/full/hardware_attested), hardware attestation for sovereign profile, five-check boundary enforcement (identity → authorization → accreditation → matrix → sovereignty).
-
-**18. Unified Governance Matrix (GMX-001–007):** Rule authoring in GitOps (four-axis match), boundary enforcement evaluation with rule_uuid in DENY responses, field-level data control (allowlist/blocklist, STRIP_FIELD/REDACT/DENY_REQUEST), sovereignty zone management, compliance domain matrix activation, Tenant/resource-type override rules, rule lifecycle with shadow mode validation.
-
-**19. Drift Reconciliation (DRC-001–005):** Drift record production with field-level detail, unsanctioned change classification and severity escalation, drift severity classification (field criticality × change magnitude), drift resolution tracking with clean-state confirmation, governance matrix integration for expected provider change detection.
-
-**20. Federated Contribution Model (FCM-001–007):** Consumer policy authoring (policy_author role, PR + shadow mode), provider resource type publication (registry PR for admin review), provider service layer contribution, consumer resource group and definition contribution, federation contribution by peer DCMs (scoped by trust posture), contribution review and lifecycle management (withdraw/status/orphan assignment), contributor scope enforcement (hard DENY via Governance Matrix at contribution time). FCM-001–007 are off the critical path — they extend multi-user capabilities but are not required for the initial end-to-end demonstration.
-
-
-**6 specifications graduated from WIP to Draft:**
-dcm-registration-spec.md · dcm-opa-integration-spec.md · 11-kubernetes-compatibility.md · dcm-operator-interface-spec.md · dcm-operator-sdk-api.md · dcm-admin-api-spec.md
-
-**2 specifications remain WIP:**
-consumer-api-spec.md (missing complete lifecycle endpoint coverage) · dcm-flow-gui-spec.md (conceptual only; interaction model not yet specified)
-
----
+**SMX-008 hard constraint:** auto_approve_below ≤ 50 in ALL profiles
+**ATM-002 hard constraint:** auto tier max_score ≤ 50 in ALL profiles
+**CPX-001 absolute:** credential values NEVER in DCM stores in ANY profile
+**EVT-007:** audit.* critical events are non-suppressable
 
 
 ## SECTION 60 — DOCUMENTATION STRUCTURE
@@ -4272,14 +4267,14 @@ score_record_uuid, request_uuid, entity_uuid, request_risk_score, routing_decisi
 
 ### New API Endpoints
 Consumer: risk_score + advisory_warnings on POST /api/v1/requests response and GET status
-Admin: GET/PATCH /admin/api/v1/profiles/{name}/scoring · POST overrides · GET/POST /actors/{uuid}/risk-history · GET /scoring/audit
+Admin: GET/PATCH /api/v1/admin/profiles/{name}/scoring · POST overrides · GET/POST /actors/{uuid}/risk-history · GET /scoring/audit
 Flow GUI: GET /flow/api/v1/graph/scoring-overlay · POST /flow/api/v1/simulate/score · Threshold slider in Profile Management view · Score breakdown panel in Simulation
 
 ### SMX-001–010 System Policies
 SMX-001: GateKeeper must declare enforcement_class (compliance default). SMX-002: Validation must declare output_class (structural default). SMX-003: regulatory_mandate:true = no profile demotion. SMX-004: Governance Matrix always boolean. SMX-005: signal weights must sum to 1.00. SMX-006: Score Records immutable. SMX-007: actor risk history not exposed to other consumers. SMX-008: auto_approve_below ≤ 50. SMX-009: scoring_weight 1–100; aggregate capped at 100 before weighting. SMX-010: Score Record required for every scored request.
 
 ### Capabilities
-SMX-001 through SMX-008 in Capabilities Matrix Domain 21. Total: 134 capabilities, 21 domains.
+SMX-001 through SMX-008 in Capabilities Matrix Domain 21. Total: 167 capabilities, 26 domains.
 
 ---
 
@@ -4444,11 +4439,11 @@ When tier registry changes, DCM computes a **tier_impact_diff** — a structured
 - **PROFILE_GAP**: new tier inserted but profile threshold list not updated → warning, does not block (ATM-012)
 - **SECURITY_UPGRADE / STALE_WEIGHT**: informational, does not block
 
-Degradation review gate: each SECURITY_DEGRADATION must be accepted via `POST /admin/api/v1/tier-registry/{change_uuid}/accept-degradation` by a `verified` or `authorized` tier reviewer before activation.
+Degradation review gate: each SECURITY_DEGRADATION must be accepted via `POST /api/v1/admin/tier-registry/{change_uuid}/accept-degradation` by a `verified` or `authorized` tier reviewer before activation.
 
 Impact report (ATM-011) stored in Audit Store for every registry change, at proposal and at activation.
 
-Admin API: POST /admin/api/v1/tier-registry/changes (propose) · GET .../impact (report) · POST .../accept-degradation · POST .../activate
+Admin API: POST /api/v1/admin/tier-registry/changes (propose) · GET .../impact (report) · POST .../accept-degradation · POST .../activate
 
 ### ATM-001–ATM-012 System Policies
 ATM-001: tiers identified by name; weight derived from position. ATM-002: auto tier max_score ≤ 50. ATM-003: custom gravity consistent with position. ATM-004: custom tiers require verified-tier approval. ATM-005: custom tiers cannot change existing tier dcm_gate semantics. ATM-006: dcmgroup_required tiers must have DCMGroup declared before use. ATM-007: four gravity values are DCM vocabulary (org cannot add gravity values). ATM-008: approval records store weight at creation time for point-in-time audit.
@@ -4465,7 +4460,7 @@ Peer DCM instances may have different custom tier lists. Resolution strategy: `g
 ### Base Envelope (all events share this)
 event_uuid (idempotency key — EVT-002: consumers must treat duplicates as already-processed) · event_type · event_schema_version · timestamp (from Commit Log — authoritative) · dcm_version · dcm_instance_uuid · subject (entity_uuid, entity_type, entity_handle, tenant_uuid, actor_uuid) · urgency (critical/high/medium/low/info) · payload (event-specific) · links (self, audit_record)
 
-### Event Domains (82 total across 20 domains)
+### Event Domains (82 total across 26 domains)
 request.* (14): submitted → intent_captured → layers_assembled → policies_evaluated → requires_approval → approved → placement_complete → dispatched → compound_assembled → dependencies_resolved → realized/failed/gatekeeper_rejected/cancelled
 entity.* (13): realized, state_changed, modified, ttl_warning, ttl_expired, suspended, resumed, decommissioning, decommissioned, decommission_deferred, ownership_transferred, pending_review, expired
 drift.* (4): detected, severity_escalated, resolved, escalated
@@ -4498,7 +4493,52 @@ EVT-001: all events must include base envelope. EVT-002: event_uuid is idempoten
 
 ---
 
-## SECTION 66 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 66 — API VERSIONING STRATEGY (doc 34 — 34-api-versioning-strategy.md)
+
+> **Full specification:** [34-api-versioning-strategy.md](data-model/34-api-versioning-strategy.md) — breaking change definition, deprecation lifecycle, version discovery, sunset behavior, VER-001–VER-009.
+
+### Versioning Model
+URL path versioning: `/api/v1/`, `/api/v2/`, etc. Version is per-API surface (Consumer, Admin, Provider/OIS, Flow GUI) — NOT per-endpoint. All endpoints in a surface share the same major version. Non-breaking changes do not change the URL.
+
+### Breaking Change Definition (VER-002)
+**Breaking:** removing fields/endpoints, changing field types, changing URL structure, tightening validation, changing HTTP status semantics, removing enum values, changing HTTP method.
+**NOT breaking:** adding optional fields, adding endpoints, expanding enums, relaxing validation, adding error codes, performance changes. When in doubt → treat as breaking.
+
+### Deprecation Lifecycle
+Profile-governed support windows:
+- minimal: 90 days notice, 180 days deprecated support
+- standard: 180 days / 365 days
+- prod: 365 days / 730 days (2 years)
+- fsi: 18 months / 3 years
+- sovereign: 2 years / 4 years
+
+Deprecated versions: fully functional until sunset. Bugs fixed; features not backported. `Deprecation`, `Sunset`, `Link` headers on every response (RFC 8594/RFC 9745). VER-003.
+
+### Version Discovery
+`GET /.well-known/dcm-api-versions` — lists all API surfaces, current/supported/deprecated versions, base URLs, changelog URLs.
+Per-version changelog: `GET /api/v{N}/changelog`
+Machine-readable migration guide (required by VER-008): `GET /api/v{N}/migration-guide`
+
+### Sunset Behavior
+After sunset: `410 Gone` with successor_version, migration_guide_url, sunset_date.
+Three events: `governance.api_version_deprecated`, `governance.api_version_sunset_warning` (30 days before), `governance.api_version_sunset`.
+
+### Version Negotiation
+URL path is authoritative. Optional `DCM-API-Version: v1` header for explicit pinning (returns 406 if sunsetted).
+`/api/latest/` alias exists but NOT for production — pin to specific version.
+
+### Preview Endpoints
+`/api/v{N}/preview/` — no stability commitment; may change without major version increment; not for production automation.
+
+### OIS (Provider API) Versioning
+Providers declare `ois_version` in capability registration. DCM maintains dispatch compatibility with all supported OIS versions during deprecation window. VER-009.
+
+### VER-001–VER-009 System Policies
+VER-001: URL path versioning only. VER-002: breaking change definition. VER-003: deprecation headers required. VER-004: deprecated versions fully functional until sunset. VER-005: support windows profile-governed. VER-006: latest alias not for production. VER-007: preview endpoints not stable. VER-008: migration guide required per new major version. VER-009: OIS dispatch compatibility during deprecation window.
+
+---
+
+## SECTION 67 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, apply these instructions in addition to the numbered guidance in SECTION 60 (Documentation Structure):
 
@@ -4518,7 +4558,12 @@ When working on this project, apply these instructions in addition to the number
 186. **Credential values are NEVER stored in DCM** (CPX-001) — only metadata is stored; values are held by the Credential Provider; retrieved via authenticated endpoint; this applies to ALL credential types including dcm_interaction credentials
 187. **Every provider dispatch requires a scoped interaction credential** (CPX-002) — issued before dispatch, scoped to the specific operation+entity+provider, expires PT15M; provider must validate at use time not just receipt; check revocation cache on each use
 189. **Security properties are present in ALL profiles — minimal profile is "security with minimal operational overhead" not "minimal security"** — rotation required in all profiles (minimal: P365D max, manual OK); idle detection on in all profiles (minimal: P30D); algorithm baseline in all profiles (minimal: forbidden list); CPX-001 (values never in DCM stores) is absolute — homelab (minimal) uses bearer_token retrieval, no scheduled rotation, no FIPS; sovereign uses mtls+hardware attestation, FIPS Level 3, PT15S revocation cache; same API contract, same data model, same CPX-001 (values never in DCM stores)
-195. **33-event-catalog.md is the SINGLE authoritative source for all DCM event types** — 82 events across 20 domains; all events share the base envelope (event_uuid, event_type, event_schema_version, timestamp from Commit Log, urgency, payload, links); consumers implement idempotency using event_uuid; critical urgency events are non-suppressable; non-standard events use reverse-DNS prefix; event_schema_version only increments on breaking changes
+196. **API versioning is per-surface not per-endpoint** (VER-001) — Consumer, Admin, Provider/OIS, Flow GUI each have their own major version; all endpoints within a surface share the version; when in doubt whether a change is breaking, it is (VER-002); prod support window is 2 years deprecated after 1 year notice; sovereign is 4 years deprecated after 2 years notice; deprecated versions return Deprecation + Sunset headers (RFC 8594/RFC 9745)
+197. **Consumer API has 16 sequential sections (reorganized)** — sections were renumbered 1–16 in logical order: Auth(2), Catalog(3), Requests(4), Resources(5), Drift(6), Groups(7), Approvals(8), Cost(9), Notifications(10), Search(11), Audit(12), Errors(13), Contributions(14), Credentials(15), Conformance(16); old 5b/5c/6b/7b numbering is gone
+198. **Admin API base URL is /api/v1/admin/ (version-first)** — NOT /admin/api/v1/; all 40 admin endpoints use /api/v1/admin/; this is the authoritative form used everywhere in the specs and data model docs
+199. **Consumer API has idempotency (1.5), rate limiting (1.6), request IDs (1.7), and standard envelope (1.8)** — POST requests support Idempotency-Key header (PT24H retention); rate limits are profile-governed (60/min minimal → 600/min sovereign) with Retry-After on 429; all list responses use {"items":[...],"total":N,"next_cursor":"..."} envelope; X-DCM-Request-ID and X-DCM-Correlation-ID on all responses
+200. **OIS health check response is normative (not optional)** — providers MUST return {status: pass|warn|fail, version, dcm_registration_status}; missing/malformed body = warn; 3 consecutive non-200 = provider.unhealthy event; response format follows RFC 8615 / IANA health+json
+195. **33-event-catalog.md is the SINGLE authoritative source for all DCM event types** — 82 events across 26 domains; all events share the base envelope (event_uuid, event_type, event_schema_version, timestamp from Commit Log, urgency, payload, links); consumers implement idempotency using event_uuid; critical urgency events are non-suppressable; non-standard events use reverse-DNS prefix; event_schema_version only increments on breaking changes
 194. **Tier registry changes are gated by impact detection** — any change that creates a SECURITY_DEGRADATION (tier gravity or position decreased) blocks activation until each degradation is explicitly accepted by a verified-tier or above reviewer via Admin API; BROKEN_REFERENCE also blocks; PROFILE_GAP is a warning that does not block; all changes produce an impact report in the Audit Store (ATM-009–012)
 193. **Authority tiers are named positions in an ordered list — not fixed enum values** — tier weight derived from list position at evaluation time; organizations insert custom tiers between existing ones without breaking existing name references; 'authorized' tier always means 'highest current gravity' regardless of what's been inserted before it; ATM-001: never hardcode tier weights
 192. **DCM provides the approval gate and audit trail — the review process is the organization's responsibility** — for authorized tier: DCM tracks quorum of a DCMGroup; the authorized deliberation and vote collection happen outside DCM; external systems (ServiceNow, Jira, Slack bots) can call Admin API to record votes; DCM does NOT build authorized management; for reviewed and verified: same principle — DCM holds the pipeline until the API receives the required decisions

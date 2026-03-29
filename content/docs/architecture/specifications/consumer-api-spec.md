@@ -58,13 +58,113 @@ This specification primarily documents the REST API surface. The Git PR ingress 
 https://{dcm-instance}/api/v1/
 ```
 
-All Consumer API endpoints are versioned. Breaking changes increment the version. Non-breaking additions do not.
+All Consumer API endpoints are versioned. Breaking changes increment the major version segment (`v1` → `v2`). Non-breaking additions do not change the version.
+
+> **Full versioning strategy:** See [API Versioning Strategy](../data-model/34-api-versioning-strategy.md) for the complete definition of breaking changes, deprecation timeline, version discovery, sunset behavior, deprecation headers, and VER-001–VER-009 system policies.
+
+**Key rules for Consumer API consumers:**
+- Pin to a specific version (`/api/v1/`) in production — do not use the `/api/latest/` alias
+- When a version is deprecated, responses include `Deprecation` and `Sunset` headers (RFC 8594/RFC 9745)
+- Deprecated versions remain functional until the sunset date — bugs fixed, features not backported
+- Version discovery: `GET /.well-known/dcm-api-versions`
+- Migration guide: `GET /api/v{N}/migration-guide`
+
+**What is a breaking change in the Consumer API:**
+Removing a field, changing a field type, removing an endpoint, changing HTTP status semantics, tightening validation, changing URL structure. New optional fields, new endpoints, and expanded enums are not breaking.
+
+**Support windows (profile-governed):**
+- `minimal`: 90 days notice, 180 days deprecated support
+- `standard`: 180 days notice, 365 days deprecated support
+- `prod`: 365 days notice, 730 days (2 years) deprecated support
+- `fsi`: 18 months notice, 3 years deprecated support
+- `sovereign`: 2 years notice, 4 years deprecated support
 
 ### 1.4 Content Type
 
 All requests and responses use `application/json`. The DCM Unified Data Model is expressed as JSON throughout the Consumer API.
 
+### 1.5 Idempotency
+
+DCM's request model provides built-in idempotency for `POST /api/v1/requests`. Each request submission produces an `entity_uuid` at Intent State creation. If a client retries a request submission (e.g. after a network timeout), it may receive a duplicate Intent State — but DCM's deduplication layer detects identical payloads from the same actor within a 5-minute window and returns the existing request record rather than creating a second one.
+
+For operations where explicit idempotency control is needed, clients may supply an `Idempotency-Key` header:
+
+```http
+POST /api/v1/requests
+Idempotency-Key: <client-generated-uuid>
+```
+
+If DCM receives two requests with the same `Idempotency-Key` from the same authenticated actor within PT24H, the second request returns the response from the first. The idempotency key is stored for PT24H then discarded.
+
+**Which endpoints support `Idempotency-Key`:**
+- `POST /api/v1/requests` — resource request submission
+- `POST /api/v1/credentials/{uuid}/rotate` — credential rotation request
+- `POST /api/v1/resources/{uuid}/rehydrate` — rehydration trigger
+
+### 1.6 Rate Limiting
+
+Rate limits are profile-governed and apply per authenticated actor:
+
+| Profile | Requests/minute | Burst allowance | Rate limit header |
+|---------|----------------|-----------------|-------------------|
+| `minimal` | 60 | 20 | Yes |
+| `standard` | 300 | 100 | Yes |
+| `prod` | 600 | 200 | Yes |
+| `fsi` | 600 | 200 | Yes |
+| `sovereign` | 600 | 200 | Yes |
+
+When rate limited, DCM returns:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 12
+X-RateLimit-Limit: 300
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1749340800
+
+{
+  "error": "rate_limit_exceeded",
+  "message": "Request rate limit exceeded. Retry after 12 seconds.",
+  "retry_after_seconds": 12
+}
+```
+
+### 1.7 Request and Correlation IDs
+
+Every DCM API response includes:
+
+```http
+X-DCM-Request-ID: <uuid>       # unique ID for this HTTP request; use for support
+X-DCM-Correlation-ID: <uuid>   # links related requests across the pipeline
+```
+
+Include `X-DCM-Request-ID` when contacting support. Use `X-DCM-Correlation-ID` to trace a request through the audit trail (`GET /api/v1/audit/correlation/{correlation_id}`).
+
 ---
+
+### 1.8 Standard Response Envelopes
+
+**List responses** always use this envelope:
+```json
+{
+  "items": [...],           // always "items" regardless of resource type
+  "total": 142,             // total matching records (before pagination)
+  "page_size": 25,
+  "next_cursor": "<string>" // null if no more pages; use as ?cursor= on next request
+}
+```
+
+**Single resource responses** return the resource object directly (no wrapper).
+
+**Error responses** always use:
+```json
+{
+  "error": "<error_code>",    // machine-readable snake_case code
+  "message": "<string>",      // human-readable description
+  "request_id": "<uuid>",     // matches X-DCM-Request-ID header
+  "details": {}               // optional: field-level validation errors etc.
+}
+```
 
 ## 2. Authentication
 
@@ -283,7 +383,7 @@ Same response shape as List Catalog Items.
 
 ---
 
-## 4. Request Submission
+## 4. Request Submission and Lifecycle
 
 ### 4.1 Submit Resource Request
 
@@ -948,7 +1048,7 @@ Response 200:
 
 ---
 
-## 5b. Drift Management
+## 6. Drift Management
 
 ### 5b.1 List Drift Records for a Resource
 
@@ -1045,7 +1145,7 @@ Response 202 Accepted:
 
 ---
 
-## 5c. Groups and Relationships
+## 7. Groups and Relationships
 
 ### 5c.1 List Resource Groups
 
@@ -1153,7 +1253,7 @@ Response 200:
 
 ---
 
-## 6b. Requests Management
+## 8. Requests and Approvals
 
 ### 6b.1 List Requests
 
@@ -1247,7 +1347,7 @@ Response 202 Accepted:
 
 ---
 
-## 7b. Cost and Quota
+## 9. Cost and Quota
 
 ### 7b.1 Get Cost Estimate (Pre-Submission)
 
@@ -1338,7 +1438,7 @@ Response 200:
 
 ---
 
-## 7c. Notifications and Webhooks
+## 10. Notifications and Webhooks
 
 ### 7c.1 List Notifications
 
@@ -1434,7 +1534,7 @@ Response 204 No Content
 
 ---
 
-## 8b. Search
+## 11. Search
 
 ### 8b.1 Cross-Resource Search
 
@@ -1475,7 +1575,7 @@ Response 200:
 ```
 
 
-## 6. Audit Trail
+## 12. Audit Trail
 
 ### 6.1 Query Audit Records for a Resource
 
@@ -1533,7 +1633,7 @@ Response 200:
 
 ---
 
-## 7. Error Model
+## 13. Error Model
 
 All error responses follow a consistent structure:
 
@@ -1575,7 +1675,7 @@ All error responses follow a consistent structure:
 
 ---
 
-## 9. Consumer Contribution Endpoints
+## 14. Consumer Contributions
 
 Consumers with `policy_author` or `tenant_admin` role can contribute tenant-scoped artifacts directly via the Consumer API. All contributions flow through the GitOps PR model — DCM generates a PR and activates the artifact after the required review period. See [Federated Contribution Model](../data-model/28-federated-contribution-model.md) for the complete contributor permission table.
 
@@ -1681,7 +1781,7 @@ Response 200:
 
 ---
 
-## 9b. Credential Management
+## 15. Credential Management
 
 ### 9b.1 List Credentials for a Resource
 
@@ -1749,7 +1849,7 @@ Response 202 Accepted:
 ```
 
 
-## 8. Conformance Levels
+## 16. Conformance Levels
 
 The Consumer API defines three conformance levels, mirroring the Operator Interface Specification model:
 

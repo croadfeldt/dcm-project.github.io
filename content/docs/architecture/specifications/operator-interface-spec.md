@@ -46,6 +46,9 @@ Operators conforming to this specification function as Service Providers within 
 
 ## 1. Introduction
 
+> **OIS Versioning:** Providers declare the OIS version they implement in capability registration (`ois_version`). DCM maintains dispatch compatibility with all supported OIS versions during the deprecation window. See [API Versioning Strategy](../data-model/34-api-versioning-strategy.md) Section 7.
+
+
 ### 1.1 Motivation
 
 Kubernetes operators are the most mature pattern for managing complex, stateful resources declaratively on Kubernetes. However, operators operate within a single cluster and lack the cross-cluster lifecycle management, multi-tenancy, cost attribution, sovereignty governance, and policy enforcement that enterprise organizations require at scale.
@@ -248,19 +251,49 @@ DCM polls the operator's health endpoint every 10 seconds (configurable). A heal
 
 **Endpoint:** `GET /health`  
 **Authentication:** Unauthenticated (or internally secured — operator choice)  
-**Expected response:** HTTP 200 OK for healthy, any non-200 for unhealthy
+**Expected response:** HTTP 200 OK for healthy or warn status; any non-200 for unhealthy (fail)
 
-```yaml
-# Health response body (optional but recommended)
-health_response:
-  status: pass  # pass | warn | fail
-  version: <operator version>
-  uptime_seconds: <integer>
-  kubernetes_connectivity: <true|false>
-  dcm_registration_status: <registered|unregistered|error>
-  details:
-    <optional operator-specific health details>
+The health response body is **normative**. DCM uses the `status` field to determine provider health and trigger alerts. Providers that return a non-conforming or absent body are treated as `warn` until three consecutive failures, after which they are treated as `fail`.
+
+```http
+GET /health HTTP/1.1
+
+HTTP/1.1 200 OK
+Content-Type: application/health+json
+
+{
+  "status": "pass",              // REQUIRED: "pass" | "warn" | "fail"
+  "version": "<semver>",         // REQUIRED: provider software version
+  "dcm_registration_status": "registered",  // REQUIRED: "registered" | "unregistered" | "error"
+  "uptime_seconds": 86423,       // RECOMMENDED: seconds since last restart
+  "checks": {                    // RECOMMENDED: per-subsystem health
+    "provider_backend": {
+      "status": "pass",
+      "observed_at": "<ISO 8601>"
+    },
+    "credential_provider_connectivity": {
+      "status": "pass",
+      "observed_at": "<ISO 8601>"
+    }
+  },
+  "details": {}                  // OPTIONAL: operator-specific additional detail
+}
 ```
+
+**Status semantics:**
+
+| Status | HTTP code | Meaning | DCM behavior |
+|--------|-----------|---------|--------------|
+| `pass` | 200 | Fully operational | No action |
+| `warn` | 200 | Operational but degraded | Fires `provider.degraded` event; alert platform admin |
+| `fail` | any non-200 | Not operational | Fires `provider.unhealthy` event; triggers recovery policy |
+
+The health endpoint format follows [RFC 8615 / IANA health+json](https://www.iana.org/assignments/media-types/application/health+json).
+
+**DCM polling behavior:**
+- Polling interval: declared in provider capability registration (`health_check_interval`, default PT30S)
+- Consecutive `fail` threshold before `provider.unhealthy` event: 3 (profile-governed)
+- Recovery: first `pass` after `fail` fires `provider.healthy` event
 
 ### 4.3 State Machine
 

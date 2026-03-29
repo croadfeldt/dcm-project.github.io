@@ -34,7 +34,29 @@ All Admin API endpoints require Bearer token authentication (same as Consumer AP
 
 Base URL: `/api/v1/admin/`
 
+> **Versioning:** See [API Versioning Strategy](../data-model/34-api-versioning-strategy.md). Breaking changes increment the major version. The Admin API follows the same deprecation lifecycle as the Consumer API, with profile-governed support windows.
+
 Step-up MFA is required for destructive operations (Tenant decommission, accreditation revocation, bootstrap credential rotation) regardless of session MFA status.
+
+---
+
+### 1.1 Rate Limiting
+
+Admin API endpoints have separate rate limits from the Consumer API, applied per authenticated admin actor:
+
+| Profile | Requests/minute | Burst |
+|---------|----------------|-------|
+| All profiles | 120 | 40 |
+
+Rate-limited responses include `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` headers.
+
+### 1.2 Request and Correlation IDs
+
+All responses include `X-DCM-Request-ID` and `X-DCM-Correlation-ID` headers (same model as Consumer API).
+
+### 1.3 Response Envelopes
+
+List responses use `{"items": [...], "total": N, "next_cursor": "..."}`. Single resources returned directly. Errors use `{"error": "...", "message": "...", "request_id": "..."}`.
 
 ---
 
@@ -471,21 +493,32 @@ Response 200:
 
 ## 11. Error Model
 
-Same as Consumer API. Additional admin-specific codes:
+All Admin API errors use the same envelope as the Consumer API:
 
-| HTTP Status | Error Code | Meaning |
-|-------------|-----------|---------|
-| 403 | `insufficient_role` | Operation requires platform_admin; actor is tenant_admin |
-| 403 | `cross_tenant_denied` | tenant_admin attempting operation outside their Tenant |
-| 409 | `tenant_has_active_entities` | Tenant decommission blocked; active entities remain |
-| 409 | `provider_has_active_entities` | Provider decommission blocked; entities hosted there |
+```json
+{
+  "error": "<error_code>",    // machine-readable snake_case code
+  "message": "<string>",      // human-readable description
+  "request_id": "<uuid>",     // matches X-DCM-Request-ID header
+  "details": {}               // optional: field-level details
+}
+```
 
----
+**Admin-specific error codes:**
 
-*Document maintained by the DCM Project. For questions or contributions see [GitHub](https://github.com/dcm-project).*
+| Error Code | HTTP Status | When |
+|-----------|-------------|------|
+| `insufficient_admin_role` | 403 | Actor lacks required admin role |
+| `tenant_not_found` | 404 | Tenant UUID not found |
+| `provider_not_found` | 404 | Provider UUID not found |
+| `approval_already_voted` | 409 | Actor has already voted on this approval |
+| `approval_window_expired` | 410 | Approval window has passed |
+| `degradation_already_accepted` | 409 | Degradation item already accepted |
+| `tier_registry_blocked` | 409 | Registry change has unresolved blocking items |
+| `quota_below_current_usage` | 422 | New quota would be below current consumption |
 
+All error responses include `X-DCM-Request-ID` and `X-DCM-Correlation-ID` headers.
 
----
 
 ## Scoring Model Administration
 
@@ -494,7 +527,7 @@ Same as Consumer API. Additional admin-specific codes:
 ### Get Scoring Thresholds for Profile
 
 ```
-GET /admin/api/v1/profiles/{profile_name}/scoring
+GET /api/v1/admin/profiles/{profile_name}/scoring
 
 Response 200:
 {
@@ -521,7 +554,7 @@ Response 200:
 ### Update Scoring Thresholds
 
 ```
-PATCH /admin/api/v1/profiles/{profile_name}/scoring
+PATCH /api/v1/admin/profiles/{profile_name}/scoring
 {
   "scoring_thresholds": {
     "auto_approve_below": 20,
@@ -540,7 +573,7 @@ Response 422: { "error": "threshold_invalid", "reason": "auto_approve_below exce
 ### Add Policy Enforcement Override
 
 ```
-POST /admin/api/v1/profiles/{profile_name}/scoring/overrides
+POST /api/v1/admin/profiles/{profile_name}/scoring/overrides
 {
   "policy_handle": "platform/gatekeeper/cpu-size-limit",
   "override_enforcement_class": "compliance",
@@ -555,7 +588,7 @@ Response 201 Created:
 ### Actor Risk History
 
 ```
-GET /admin/api/v1/actors/{actor_uuid}/risk-history
+GET /api/v1/admin/actors/{actor_uuid}/risk-history
 
 Response 200:
 {
@@ -575,7 +608,7 @@ Response 200:
   "score_half_life_days": 7
 }
 
-POST /admin/api/v1/actors/{actor_uuid}/risk-history/reset
+POST /api/v1/admin/actors/{actor_uuid}/risk-history/reset
 {
   "reason": "Actor confirmed as trusted automation account",
   "audit_note": "Reviewed and approved by platform admin"
@@ -585,7 +618,7 @@ POST /admin/api/v1/actors/{actor_uuid}/risk-history/reset
 ### Score Audit Trail
 
 ```
-GET /admin/api/v1/scoring/audit
+GET /api/v1/admin/scoring/audit
 
 Query parameters:
   from=<ISO 8601>
@@ -620,7 +653,7 @@ DCM provides approval gates for requests, policy contributions, provider registr
 ### List Pending Approvals
 
 ```
-GET /admin/api/v1/approvals/pending
+GET /api/v1/admin/approvals/pending
 
 Query parameters:
   approval_type=<request | policy_contribution | provider_registration | federation_contribution>
@@ -650,7 +683,7 @@ Response 200:
 ### Record an Approval Decision
 
 ```
-POST /admin/api/v1/approvals/{approval_uuid}/vote
+POST /api/v1/admin/approvals/{approval_uuid}/vote
 
 {
   "decision": "approve | reject",
@@ -689,7 +722,7 @@ Response 410: approval window has expired
 ### Get Approval Detail
 
 ```
-GET /admin/api/v1/approvals/{approval_uuid}
+GET /api/v1/admin/approvals/{approval_uuid}
 
 Response 200:
 {
@@ -725,7 +758,7 @@ Response 200:
 ### Propose a Tier Registry Change
 
 ```
-POST /admin/api/v1/tier-registry/changes
+POST /api/v1/admin/tier-registry/changes
 
 {
   "proposed_tiers": [
@@ -749,7 +782,7 @@ Response 202 Accepted:
 ### Get Tier Registry Impact Report
 
 ```
-GET /admin/api/v1/tier-registry/changes/{change_uuid}/impact
+GET /api/v1/admin/tier-registry/changes/{change_uuid}/impact
 
 Response 200:
 {
@@ -778,7 +811,7 @@ Response 200:
 ### Accept a Security Degradation
 
 ```
-POST /admin/api/v1/tier-registry/changes/{change_uuid}/accept-degradation
+POST /api/v1/admin/tier-registry/changes/{change_uuid}/accept-degradation
 
 {
   "affected_item_uuid": "<uuid>",
@@ -802,7 +835,7 @@ Response 409: degradation already accepted
 ### Activate a Tier Registry Change
 
 ```
-POST /admin/api/v1/tier-registry/changes/{change_uuid}/activate
+POST /api/v1/admin/tier-registry/changes/{change_uuid}/activate
 
 Response 200:
 {
@@ -818,7 +851,7 @@ Response 409: change has unresolved blocking items (broken_references or unaccep
 ### List Historical Registry Changes
 
 ```
-GET /admin/api/v1/tier-registry/changes?status=activated&limit=20
+GET /api/v1/admin/tier-registry/changes?status=activated&limit=20
 
 Response 200:
 {

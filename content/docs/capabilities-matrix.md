@@ -354,6 +354,19 @@
 ---
 
 
+## 26. API Versioning
+
+| ID | Capability | Consumer | Service Provider | Platform/Admin | Depends On |
+|----|-----------|---------|---------|---------------|-----------|
+| VER-001 | Version Discovery | Discover available API versions and their status via `GET /.well-known/dcm-api-versions`; learn current, supported, and deprecated versions; get changelog and migration guide URLs | Declare supported OIS version in capability registration | Monitor version adoption; manage sunset schedules | — |
+| VER-002 | Breaking Change Governance | Receive at least the profile-governed deprecation notice period before a breaking change takes effect; continue using deprecated versions until sunset date | Receive OIS version deprecation notice; migrate to new OIS version before sunset | Declare new major versions; configure deprecation timeline per profile; ensure VER-002 (breaking change definition) is applied | VER-001 |
+| VER-003 | Deprecation Headers | Receive `Deprecation`, `Sunset`, and `Link` headers on all responses from deprecated API versions (RFC 8594/RFC 9745); use these to drive migration priority | — | Configure header injection for deprecated versions; ensure headers are accurate | VER-002 |
+| VER-004 | Migration Guide | Access machine-readable migration guide at `GET /api/v{N}/migration-guide`; understand all breaking changes from previous version with migration instructions | Access OIS migration guide at `GET /provider/api/v{N}/migration-guide` | Maintain migration guides for all new major versions (required by VER-008) | VER-002 |
+| VER-005 | Preview Endpoints | Access preview endpoints at `/api/v{N}/preview/`; understand stability commitment is none; provide feedback before graduation | — | Mark endpoints as preview; graduate to stable in new major version | VER-001 |
+
+---
+
+
 ## Capability Count Summary
 
 | Domain | Capabilities |
@@ -383,7 +396,8 @@
 | Credential Provider Model | 7 |
 | Authority Tier Model | 7 |
 | Event Catalog | 7 |
-| **Total** | **162** |
+| API Versioning | 5 |
+| **Total** | **167** |
 
 ---
 
