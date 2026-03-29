@@ -113,6 +113,18 @@ The DCM taxonomy defines the precise vocabulary used throughout the architecture
 
 
 
+
+### Event Catalog Terms
+
+| Term | Definition |
+|------|-----------|
+| **Event Catalog** | The authoritative source for all DCM event types, their payload schemas, urgency levels, and trigger conditions. See [33-event-catalog.md]. 82 event types across 20 domains. |
+| **Event Envelope** | The common wrapper all DCM events share: event_uuid (idempotency key), event_type, event_schema_version, timestamp (from Commit Log), dcm_version, dcm_instance_uuid, subject, urgency, payload, links. |
+| **event_uuid** | Stable idempotency key assigned to each event. Consumers must treat duplicate event_uuid values as already-processed — DCM delivers at-least-once. |
+| **event_schema_version** | Increments on breaking payload schema changes. Adding optional fields is not breaking. Removing fields, changing types, or changing semantics are breaking. |
+| **EVT-001–EVT-007** | Event Catalog system policies. Key: EVT-001 (all events must include base envelope), EVT-002 (event_uuid is idempotency key), EVT-005 (critical urgency events delivered via push regardless of subscriptions), EVT-006 (non-standard events use reverse-DNS prefix), EVT-007 (audit.* critical events are non-suppressable). |
+
+
 ### Authority Tier Model Terms
 
 | Term | Definition |
@@ -240,6 +252,7 @@ Terms to avoid because they introduce ambiguity. Use the precise alternatives in
 | CPX | Credential Provider Model |
 | DPO | Design Priority Order |
 | ATM | Authority Tier Model |
+| EVT | Event Catalog |
 
 ---
 

@@ -30,6 +30,9 @@ weight: 23
 
 ---
 
+
+> **See [Event Catalog](33-event-catalog.md)** — authoritative source for all DCM event types and payload schemas.
+
 ## 1. Purpose
 
 The DCM Notification Model defines a **unified, configurable notification pipeline** that routes event notifications to all parties with a stake in a changed resource — not just the original requestor. The audience for any notification is derived from the **entity relationship graph**, not from who submitted the original request.

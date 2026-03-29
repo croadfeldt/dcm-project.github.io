@@ -4458,7 +4458,47 @@ Peer DCM instances may have different custom tier lists. Resolution strategy: `g
 
 ---
 
-## SECTION 65 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 65 — EVENT CATALOG (doc 33 — 33-event-catalog.md)
+
+> **Full specification:** [33-event-catalog.md](data-model/33-event-catalog.md) — authoritative source for all 82 DCM event types, payload schemas, urgency levels, EVT-001–EVT-007 system policies.
+
+### Base Envelope (all events share this)
+event_uuid (idempotency key — EVT-002: consumers must treat duplicates as already-processed) · event_type · event_schema_version · timestamp (from Commit Log — authoritative) · dcm_version · dcm_instance_uuid · subject (entity_uuid, entity_type, entity_handle, tenant_uuid, actor_uuid) · urgency (critical/high/medium/low/info) · payload (event-specific) · links (self, audit_record)
+
+### Event Domains (82 total across 20 domains)
+request.* (14): submitted → intent_captured → layers_assembled → policies_evaluated → requires_approval → approved → placement_complete → dispatched → compound_assembled → dependencies_resolved → realized/failed/gatekeeper_rejected/cancelled
+entity.* (13): realized, state_changed, modified, ttl_warning, ttl_expired, suspended, resumed, decommissioning, decommissioned, decommission_deferred, ownership_transferred, pending_review, expired
+drift.* (4): detected, severity_escalated, resolved, escalated
+provider.* (5): registered, deregistered, healthy, unhealthy, degraded
+provider_update.* (5): submitted, requires_approval, approved, rejected, auto_approved
+rehydration.* (5): started, paused, interrupted, completed, blocked
+policy.* (4): activated, deactivated, evaluated, shadow_result
+credential.* (4): rotating, revoked, idle, expired
+approval.* (4): decision_recorded, quorum_reached, window_expiring, expired
+tier_registry.* (4): proposed, impact_assessed, degradation_detected, activated
+audit.* (3): chain_integrity_alert, chain_break, forward_failed
+dependency.* (2): state_changed + stakeholder.resource_decommissioning
+allocation.* (2): pool_capacity_low, released
+ingestion.* (3): transitional_created, enriched, promotion_approved
+governance.* (3): catalog_item_deprecated, profile_changed, policy_trust_elevated
+security.*/sovereignty.*/federation.*/auth.*: unsanctioned_provider_write, sovereignty.violation, sovereignty.migration_required, federation.tunnel_degraded, auth.provider_failover
+
+### Urgency Levels
+critical (push + page if configured) · high (push) · medium (standard) · low (standard) · info (batch/webhook only)
+critical + audit.* events: NON-SUPPRESSABLE — EVT-005 and EVT-007
+
+### Schema Versioning
+event_schema_version increments ONLY on breaking changes (removing fields, changing types/semantics). Adding optional fields is NOT breaking. EVT-004.
+
+### Non-Standard Events
+Providers/extensions may publish non-standard events using reverse-DNS prefix (e.g. com.acme.custom_event). EVT-006.
+
+### EVT-001–EVT-007 System Policies
+EVT-001: all events must include base envelope. EVT-002: event_uuid is idempotency key. EVT-003: timestamp from Commit Log. EVT-004: schema version increments on breaking changes only. EVT-005: critical urgency → push delivery. EVT-006: non-standard events use reverse-DNS prefix. EVT-007: audit.* critical events are non-suppressable.
+
+---
+
+## SECTION 66 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, apply these instructions in addition to the numbered guidance in SECTION 60 (Documentation Structure):
 
@@ -4478,6 +4518,7 @@ When working on this project, apply these instructions in addition to the number
 186. **Credential values are NEVER stored in DCM** (CPX-001) — only metadata is stored; values are held by the Credential Provider; retrieved via authenticated endpoint; this applies to ALL credential types including dcm_interaction credentials
 187. **Every provider dispatch requires a scoped interaction credential** (CPX-002) — issued before dispatch, scoped to the specific operation+entity+provider, expires PT15M; provider must validate at use time not just receipt; check revocation cache on each use
 189. **Security properties are present in ALL profiles — minimal profile is "security with minimal operational overhead" not "minimal security"** — rotation required in all profiles (minimal: P365D max, manual OK); idle detection on in all profiles (minimal: P30D); algorithm baseline in all profiles (minimal: forbidden list); CPX-001 (values never in DCM stores) is absolute — homelab (minimal) uses bearer_token retrieval, no scheduled rotation, no FIPS; sovereign uses mtls+hardware attestation, FIPS Level 3, PT15S revocation cache; same API contract, same data model, same CPX-001 (values never in DCM stores)
+195. **33-event-catalog.md is the SINGLE authoritative source for all DCM event types** — 82 events across 20 domains; all events share the base envelope (event_uuid, event_type, event_schema_version, timestamp from Commit Log, urgency, payload, links); consumers implement idempotency using event_uuid; critical urgency events are non-suppressable; non-standard events use reverse-DNS prefix; event_schema_version only increments on breaking changes
 194. **Tier registry changes are gated by impact detection** — any change that creates a SECURITY_DEGRADATION (tier gravity or position decreased) blocks activation until each degradation is explicitly accepted by a verified-tier or above reviewer via Admin API; BROKEN_REFERENCE also blocks; PROFILE_GAP is a warning that does not block; all changes produce an impact report in the Audit Store (ATM-009–012)
 193. **Authority tiers are named positions in an ordered list — not fixed enum values** — tier weight derived from list position at evaluation time; organizations insert custom tiers between existing ones without breaking existing name references; 'authorized' tier always means 'highest current gravity' regardless of what's been inserted before it; ATM-001: never hardcode tier weights
 192. **DCM provides the approval gate and audit trail — the review process is the organization's responsibility** — for authorized tier: DCM tracks quorum of a DCMGroup; the authorized deliberation and vote collection happen outside DCM; external systems (ServiceNow, Jira, Slack bots) can call Admin API to record votes; DCM does NOT build authorized management; for reviewed and verified: same principle — DCM holds the pipeline until the API receives the required decisions

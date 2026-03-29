@@ -339,6 +339,21 @@
 ---
 
 
+## 25. Event Catalog
+
+| ID | Capability | Consumer | Service Provider | Platform/Admin | Depends On |
+|----|-----------|---------|---------|---------------|-----------|
+| EVT-001 | Event Subscription | Subscribe to DCM events via Notification Provider or Message Bus; filter by event type, entity type, urgency; idempotency via event_uuid | Publish standard events when provider actions occur; use reverse-DNS prefix for non-standard events | Configure Notification Provider channels and audience routing | IAM-001, OBS-001 |
+| EVT-002 | Request Pipeline Events | Receive real-time status of own requests (submitted → intent_captured → policies_evaluated → requires_approval → approved → dispatched → realized/failed) | — | Configure request event delivery per profile; manage urgency routing | REQ-001 |
+| EVT-003 | Entity Lifecycle Events | Receive entity lifecycle events (realized, state_changed, ttl_warning, decommissioning, etc.) for owned entities and entities with stakes | — | Configure entity event delivery; manage stakeholder audience routing | LCM-001 |
+| EVT-004 | Security and Critical Events | Receive critical security events (audit chain alerts, sovereignty violations, unsanctioned provider writes) regardless of subscription preferences | — | Configure non-suppressable event delivery; manage security team routing | AUD-001, ZTS-001 |
+| EVT-005 | Approval Pipeline Events | Receive approval events (requires_approval, decision_recorded, quorum_reached, window_expiring, expired) for own requests and approvals | — | Configure reviewer notification routing; manage approval window alerts | ATM-001, IAM-001 |
+| EVT-006 | Provider and Infrastructure Events | — | Publish provider health events (registered, healthy, unhealthy, degraded); publish provider_update events on entity changes | Monitor provider health events; configure provider degradation alerts | PRV-001 |
+| EVT-007 | Tier Registry and Governance Events | — | — | Receive tier_registry events (proposed, impact_assessed, degradation_detected, activated); configure governance event routing | ATM-004 |
+
+---
+
+
 ## Capability Count Summary
 
 | Domain | Capabilities |
@@ -367,7 +382,8 @@
 | Meta Provider Composability | 7 |
 | Credential Provider Model | 7 |
 | Authority Tier Model | 7 |
-| **Total** | **155** |
+| Event Catalog | 7 |
+| **Total** | **162** |
 
 ---
 

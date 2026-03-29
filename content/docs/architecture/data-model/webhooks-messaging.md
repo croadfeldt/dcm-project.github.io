@@ -30,6 +30,9 @@ weight: 18
 
 ---
 
+
+> **See [Event Catalog](33-event-catalog.md)** — authoritative source for all DCM event types and payload schemas.
+
 ## 1. Purpose
 
 DCM communicates with the outside world through three complementary mechanisms:
