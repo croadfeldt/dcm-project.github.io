@@ -262,9 +262,18 @@
 | DRC-004 | Drift Resolution Tracking | View drift record status (open/acknowledged/resolved/escalated); receive resolved notification when next discovery confirms clean state | — | Monitor drift resolution rates; configure escalation policies for aged-open drift records | DRC-001, DRF-004 |
 | DRC-005 | Governance Matrix Drift Integration | — | — | Configure governance matrix check in drift comparison pipeline: expected provider changes are not flagged as drift | DRC-001, GMX-001 |
 
----
 
+## 20. Federated Contribution Model
 
+| ID | Capability | Consumer | Service Provider | Platform/Admin | Depends On |
+|----|-----------|---------|---------|---------------|-----------|
+| FCM-001 | Consumer Policy Authoring | Author and submit tenant-domain policies (GateKeeper, Transformation, Recovery, Lifecycle, Orchestration Flow, Governance Matrix rules) via API or Flow GUI; receive PR URL and shadow mode results | — | Configure consumer policy authoring permissions (policy_author role); manage review requirements per profile | POL-001, IAM-003, IAM-007 |
+| FCM-002 | Provider Resource Type Publication | — | Publish Resource Type Specifications and Catalog Items for offered resource types via provider contribution API; receive registry PR for platform admin review | Manage provider contribution registry; configure review requirements for provider specs; manage Organization-tier registry | PRV-001, GOV-003 |
+| FCM-003 | Provider Service Layer Contribution | — | Contribute Service Layers for offered resource types; layers applied during request assembly for all consumers requesting that resource type | Review and activate provider-contributed layers; manage layer compatibility | PRV-001, LAY-002 |
+| FCM-004 | Consumer Resource Group and Definition Contribution | Author and manage resource groups, notification subscriptions, webhook registrations, and cross-tenant authorization records within own Tenant | — | Configure contribution permissions per role; manage Tenant-scoped artifact lifecycle | IAM-007, GOV-002 |
+| FCM-005 | Federation Contribution (Peer DCM) | — | Peer DCM contributes registry entries, policy templates, and service layers via federation channels | Manage federation contribution trust posture (verified/vouched/provisional); configure review requirements per trust posture; manage cross-DCM artifact lifecycle | FED-001, GOV-003, POL-003 |
+| FCM-006 | Contribution Review and Lifecycle | View contribution status (proposed, pending_review, active, withdrawn); withdraw a pending contribution; receive notification when contribution is approved or rejected | Receive notification when provider contributions are reviewed | Review and approve/reject contributions via Admin API; manage shadow review periods; assign new owners to orphaned artifacts | POL-002, POL-003 |
+| FCM-007 | Contributor Scope Enforcement | Receive clear DENY response when attempting to contribute outside permitted domain scope | Receive DENY when contributing specs for resource types not offered | Monitor Governance Matrix enforcement at contribution time; configure scope violation audit and notification | GMX-001, GMX-002 |
 
 ---
 
@@ -292,7 +301,8 @@
 | Zero Trust and Security Posture | 6 |
 | Unified Governance Matrix | 7 |
 | Drift Reconciliation | 5 |
-| **Total** | **119** |
+| Federated Contribution Model | 7 |
+| **Total** | **126** |
 
 ---
 
@@ -322,6 +332,8 @@ PRV-001 (Provider Registration) — parallel critical path
 IAM-001 → IAM-002 → IAM-003 → IAM-007 → CAT-001 → REQ-001 → REQ-002 → REQ-003 → REQ-004 → REQ-005 → REQ-006 → REQ-007 → PRV-001 → PRV-002 → PRV-003 → PRV-004 → PRV-005 → LCM-001 → DRF-001 → DRF-002 → AUD-001
 
 **21 capabilities for a functional end-to-end demonstration.**
+
+**Note:** FCM-001 through FCM-007 (Federated Contribution Model) are not on the critical path — they extend DCM's multi-user capabilities but are not required for the initial end-to-end lifecycle demonstration.
 
 ---
 

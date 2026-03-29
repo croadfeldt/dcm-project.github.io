@@ -4121,7 +4121,7 @@ These items are explicitly unresolved. Do not make assumptions about them — fl
 
 ## SECTION 59 — CAPABILITIES MATRIX UPDATE (119 capabilities, 19 domains)
 
-Five new domains added to the capabilities matrix. Total: 119 capabilities across 19 domains.
+Five new domains added to the capabilities matrix. Total: 126 capabilities across 20 domains.
 
 **New domains:**
 
@@ -4132,6 +4132,8 @@ Five new domains added to the capabilities matrix. Total: 119 capabilities acros
 **18. Unified Governance Matrix (GMX-001–007):** Rule authoring in GitOps (four-axis match), boundary enforcement evaluation with rule_uuid in DENY responses, field-level data control (allowlist/blocklist, STRIP_FIELD/REDACT/DENY_REQUEST), sovereignty zone management, compliance domain matrix activation, Tenant/resource-type override rules, rule lifecycle with shadow mode validation.
 
 **19. Drift Reconciliation (DRC-001–005):** Drift record production with field-level detail, unsanctioned change classification and severity escalation, drift severity classification (field criticality × change magnitude), drift resolution tracking with clean-state confirmation, governance matrix integration for expected provider change detection.
+
+**20. Federated Contribution Model (FCM-001–007):** Consumer policy authoring (policy_author role, PR + shadow mode), provider resource type publication (registry PR for admin review), provider service layer contribution, consumer resource group and definition contribution, federation contribution by peer DCMs (scoped by trust posture), contribution review and lifecycle management (withdraw/status/orphan assignment), contributor scope enforcement (hard DENY via Governance Matrix at contribution time). FCM-001–007 are off the critical path — they extend multi-user capabilities but are not required for the initial end-to-end demonstration.
 
 
 **6 specifications graduated from WIP to Draft:**

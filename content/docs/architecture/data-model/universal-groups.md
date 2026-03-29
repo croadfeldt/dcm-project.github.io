@@ -1,5 +1,5 @@
 ---
-title: "DCM Data Model — Universal Group Model"
+title: "Universal Group Model"
 type: docs
 weight: 15
 ---
@@ -447,8 +447,8 @@ Migration uses the standard ingestion model — existing constructs are ingested
 | # | Question | Impact | Status |
 |---|----------|--------|--------|
 | 1 | Should composite group policy targeting emit a linting warning when no member_type_filter is declared? | Operational safety | ✅ Resolved — linting warning (not error) when composite policy targeting has no member_type filter; suppress with explicit_no_filter: true (GRP-016) |
-| 2 | Should there be a maximum nesting depth for tenant_boundary groups? | Operational governance | ❓ Unresolved — future consideration |
-| 3 | How does group membership interact with the Search Index? | Performance | ❓ Unresolved — future consideration |
+| 2 | Should there be a maximum nesting depth for tenant_boundary groups? | Operational governance | ✅ Resolved — Maximum nesting depth is profile-governed: standard/prod = 5 levels; fsi/sovereign = 3 levels. Deeper nesting creates policy inheritance complexity and audit graph depth issues. Enforced at group creation time. |
+| 3 | How does group membership interact with the Search Index? | Performance | ✅ Resolved — Group membership is indexed in the Search Index as a field on each entity record (member_of_groups: [uuid, ...]). The Search Index supports querying by group_uuid. Group membership changes trigger an incremental index update (not full rebuild). Staleness follows the standard Search Index model (PT5M standard profile). |
 | 4 | Should time-bounded memberships (valid_until) trigger notifications before expiry? | Consumer experience | ✅ Resolved — warn_before_expiry field on membership (GRP-014) |
 
 ---
