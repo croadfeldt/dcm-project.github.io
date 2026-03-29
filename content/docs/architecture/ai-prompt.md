@@ -484,6 +484,10 @@ Providers are **custodians** of the underlying infrastructure — they are not t
 | **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
 | **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
 | **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Federated Contribution Model** | DCM defaults to federated data creation — all authorized actor types (platform admin, consumer/tenant, service provider, peer DCM) can contribute Data artifacts within their domain scope via the GitOps PR model; see doc 28 |
+| **contributor** | Actor type that authored a Data artifact; recorded in artifact_metadata.contributed_by; determines review requirements; platform_admin / consumer / service_provider / peer_dcm |
+| **contributed_by** | Artifact metadata block recording contributor_type, actor UUID, contribution_method, pr_url, reviewed_by; immutable once set |
+| **FCM-001–008** | Federated Contribution Model system policies; key: FCM-002 (domain scope violations = hard DENY), FCM-003 (GitOps PR for all), FCM-008 (contributor scope limits absolute) |
 | **Unified Governance Matrix** | Single enforcement point for all cross-boundary decisions; four axes (subject/data/target/context); hard vs soft enforcement; field-level granularity (allowlist/blocklist/paths); profile-bound defaults; GMX-001–010 |
 | **governance_matrix_rule** | Artifact declaring match conditions across four axes and a decision (ALLOW/DENY/ALLOW_WITH_CONDITIONS/STRIP_FIELD/REDACT/AUDIT_ONLY) with hard or soft enforcement |
 | **sovereignty_zone** | Registered DCM artifact declaring geopolitical/regulatory boundary; rules reference zones by ID; inter-zone agreements declared explicitly |
@@ -2586,6 +2590,10 @@ The Ship/Shore/Enclave terminology from defense IT contexts has been replaced th
 | **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
 | **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
 | **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Federated Contribution Model** | DCM defaults to federated data creation — all authorized actor types (platform admin, consumer/tenant, service provider, peer DCM) can contribute Data artifacts within their domain scope via the GitOps PR model; see doc 28 |
+| **contributor** | Actor type that authored a Data artifact; recorded in artifact_metadata.contributed_by; determines review requirements; platform_admin / consumer / service_provider / peer_dcm |
+| **contributed_by** | Artifact metadata block recording contributor_type, actor UUID, contribution_method, pr_url, reviewed_by; immutable once set |
+| **FCM-001–008** | Federated Contribution Model system policies; key: FCM-002 (domain scope violations = hard DENY), FCM-003 (GitOps PR for all), FCM-008 (contributor scope limits absolute) |
 | **Unified Governance Matrix** | Single enforcement point for all cross-boundary decisions; four axes (subject/data/target/context); hard vs soft enforcement; field-level granularity (allowlist/blocklist/paths); profile-bound defaults; GMX-001–010 |
 | **governance_matrix_rule** | Artifact declaring match conditions across four axes and a decision (ALLOW/DENY/ALLOW_WITH_CONDITIONS/STRIP_FIELD/REDACT/AUDIT_ONLY) with hard or soft enforcement |
 | **sovereignty_zone** | Registered DCM artifact declaring geopolitical/regulatory boundary; rules reference zones by ID; inter-zone agreements declared explicitly |
@@ -3560,6 +3568,54 @@ DRC-001 through DRC-005. Nine control plane components now fully defined in doc 
 ---
 
 
+## SECTION 61 — FEDERATED CONTRIBUTION MODEL (doc 28)
+
+### Core Principle
+DCM defaults to a federated model for data creation, import, usage, and lifecycle. Every authorized actor type can contribute Data artifacts within their permitted domain scope. The same GitOps PR flow and lifecycle (developing → proposed → active → deprecated → retired) applies to all contributors. Profile-bound auto-approval governs what requires human review.
+
+### Four Contributor Types
+1. **Platform Admin** — all artifact types, all domains, no restrictions
+2. **Consumer/Tenant** — tenant-domain policies, resource groups, notification subscriptions, webhook registrations, cross-tenant authorization records, request layers
+3. **Service Provider** — resource type specs (types they offer), provider catalog items, service layers, provider-domain policies
+4. **Peer DCM** — registry entries, policy templates, service layers (via federation channels, scoped by trust posture)
+
+### Contributor Permission Boundaries (hard DENY — Governance Matrix enforced)
+- Consumers cannot contribute system or platform domain policies
+- Providers cannot contribute specs for resource types they don't offer
+- Provisional peers can only contribute registry entries (no policies)
+- Vouched peers: registry entries + service layers only (human_review always)
+- Verified peers: registry entries + policy templates + service layers (human_review standard+; auto dev)
+
+### Universal Contribution Pipeline
+Submit → Governance Matrix evaluates contributor permissions → proposed status (shadow mode for policies) → review flow (auto / human_review / dual_approval / committee per profile + artifact type + contributor) → active → lifecycle by contributor (deprecate/retire) → platform admin override at any time
+
+### Contribution Artifact Types by Contributor
+- Consumer: tenant policies (all 7 types), resource groups, notification subs, webhooks, cross-tenant auth records, request layers
+- Provider: Resource Type Specs (their types), catalog items, service layers, provider-domain GateKeeper/Validation policies
+- Peer DCM: registry entries, policy templates (verified peers), service layers (verified/vouched)
+
+### Contribution Store Directory Structure
+`dcm-policy-store/system/` (platform admin), `platform/` (platform admin), `tenant/<handle>/` (consumer), `provider/<handle>/` (provider), `federated/<peer-dcm-uuid>/` (peer DCM)
+`dcm-registry/core/` (DCM project), `community/<contributor>/` (community), `organization/<provider>/` (org)
+
+Every artifact includes `contributed_by` block: contributor_type, actor/tenant/provider/peer_dcm UUID, contribution_method (api/flow_gui/git_pr/federation_push), pr_url, reviewed_by.
+
+### Profile-Governed Auto-Approval
+- minimal/dev: most contributions auto-approved; shadow optional
+- standard: consumer/provider policies → human_review; shadow default on, P7D
+- prod: governance matrix rules → dual_approval; provider specs → human_review; shadow P14D
+- fsi: all consumer/provider contributions → dual_approval; shadow P30D; must review all divergence cases
+- sovereign: all → committee; shadow P30D; orphaned artifacts auto-retire
+
+### Consumer API Contribution Endpoints (Section 9)
+`POST /api/v1/contribute/policy` (generates PR, activates shadow mode) · `POST /api/v1/contribute/resource-group` (activates immediately) · `GET /api/v1/contribute` (list contributions) · `DELETE /api/v1/contribute/{uuid}` (withdraw, closes PR)
+
+### FCM-001 through FCM-008 system policies
+FCM-001: contributor recorded in artifact_metadata.contributed_by; immutable. FCM-002: domain scope violations are hard DENY. FCM-003: all contributions via GitOps PR (except auto-approve profiles). FCM-004: policies enter shadow mode by default. FCM-005: platform admin override always available; audited. FCM-006: orphaned artifacts don't auto-deactivate (except sovereign). FCM-007: federation contribution scoped by trust posture. FCM-008: contributor-tier scope limits absolute — tenant domain policy cannot affect system/platform domain regardless of match conditions.
+
+---
+
+
 ## SECTION 54 — TERMINOLOGY GLOSSARY
 
 | Term | Definition |
@@ -3631,6 +3687,10 @@ DRC-001 through DRC-005. Nine control plane components now fully defined in doc 
 | **cross_tenant_authorization** | DCMGroup with group_class: cross_tenant_authorization; grants one Tenant permission to reference/allocate/stake another Tenant's resources; revocation places active allocations in PENDING_REVIEW |
 | **foundation Tenants** | Three system Tenants created at bootstrap: __platform__, __transitional__, __system__; cannot be decommissioned; declared in bootstrap manifest |
 | **QUOTA_EXCEEDED** | GateKeeper rejection code when resource quota policy fires at Step 5 (pre-placement) |
+| **Federated Contribution Model** | DCM defaults to federated data creation — all authorized actor types (platform admin, consumer/tenant, service provider, peer DCM) can contribute Data artifacts within their domain scope via the GitOps PR model; see doc 28 |
+| **contributor** | Actor type that authored a Data artifact; recorded in artifact_metadata.contributed_by; determines review requirements; platform_admin / consumer / service_provider / peer_dcm |
+| **contributed_by** | Artifact metadata block recording contributor_type, actor UUID, contribution_method, pr_url, reviewed_by; immutable once set |
+| **FCM-001–008** | Federated Contribution Model system policies; key: FCM-002 (domain scope violations = hard DENY), FCM-003 (GitOps PR for all), FCM-008 (contributor scope limits absolute) |
 | **Unified Governance Matrix** | Single enforcement point for all cross-boundary decisions; four axes (subject/data/target/context); hard vs soft enforcement; field-level granularity (allowlist/blocklist/paths); profile-bound defaults; GMX-001–010 |
 | **governance_matrix_rule** | Artifact declaring match conditions across four axes and a decision (ALLOW/DENY/ALLOW_WITH_CONDITIONS/STRIP_FIELD/REDACT/AUDIT_ONLY) with hard or soft enforcement |
 | **sovereignty_zone** | Registered DCM artifact declaring geopolitical/regulatory boundary; rules reference zones by ID; inter-zone agreements declared explicitly |

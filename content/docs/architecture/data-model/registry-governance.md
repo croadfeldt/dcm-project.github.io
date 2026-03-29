@@ -52,6 +52,25 @@ Registry governance follows the same principles as all other DCM governance: Git
 
 **Tier 3 examples:** `Acme.LegacyMainframeJob`, `Corp.ServiceNowTicket`, `Internal.ComplianceReport`
 
+
+### 2a. Three-Tier Model Applied to All Artifact Types
+
+The three-tier registry model applies to all DCM artifact types, not just resource type specs. Every artifact in DCM has a tier that determines its trust level and the review requirements for changes:
+
+| Tier | Maintained by | Examples | Review for changes |
+|------|--------------|---------|-------------------|
+| **Core** | DCM Project | Built-in policies, base layers, system resource types | DCM project PR process |
+| **Verified Community** | Named community maintainers | Community resource types, shared policy templates, vetted provider specs | Community review + platform admin acceptance |
+| **Organization** | Deploying organization | Tenant policies, provider catalog items, org-specific specs | Per profile (auto → committee) |
+
+**Contributor sub-tiers within Organization tier:**
+- `organization/platform` — authored by platform admins; highest trust in org tier
+- `organization/provider` — authored by registered Service Providers; scoped to their resource types
+- `organization/tenant` — authored by Consumer/Tenant actors; scoped to their Tenant
+
+This means a tenant-authored GateKeeper policy is Organization/Tenant tier — it has lower inherent trust than a platform-authored policy at the same domain level, and may require additional review per the active profile. See [Federated Contribution Model](28-federated-contribution-model.md).
+
+
 ### 2.2 The Federated Registry Model
 
 The registry uses a federated model — not centralized, not fully distributed. This supports air-gapped and sovereign deployments without external dependencies.

@@ -1543,13 +1543,119 @@ All error responses follow a consistent structure:
 
 ---
 
+
+---
+
+## 9. Consumer Contribution Endpoints
+
+Consumers with `policy_author` or `tenant_admin` role can contribute tenant-scoped artifacts directly via the Consumer API. All contributions flow through the GitOps PR model — DCM generates a PR and activates the artifact after the required review period. See [Federated Contribution Model](../data-model/28-federated-contribution-model.md) for the complete contributor permission table.
+
+### 9.1 Submit Policy Contribution
+
+```
+POST /api/v1/contribute/policy
+X-DCM-Tenant: <tenant-uuid>
+
+{
+  "policy_type": "gatekeeper | transformation | recovery | lifecycle | orchestration_flow | governance_matrix_rule",
+  "handle": "tenant/{tenant-handle}/gatekeeper/{name}",
+  "domain": "tenant",
+  "concern_type": "operational | security | compliance",
+  "enforcement": "soft | hard",
+  "match": { ... },
+  "output": { ... },
+  "shadow_mode": true,
+  "commit_message": "<human-readable description of what this policy does>"
+}
+
+Response 202 Accepted:
+{
+  "contribution_uuid": "<uuid>",
+  "policy_handle": "tenant/payments/gatekeeper/cost-ceiling",
+  "status": "proposed",
+  "shadow_mode": true,
+  "review_required": true,
+  "review_type": "human_review",
+  "pr_url": "https://git.corp.example.com/dcm-policies/pulls/145",
+  "shadow_results_url": "/flow/api/v1/shadow/<policy_uuid>"
+}
+```
+
+### 9.2 Submit Resource Group Definition
+
+```
+POST /api/v1/contribute/resource-group
+X-DCM-Tenant: <tenant-uuid>
+
+{
+  "handle": "tenant/{tenant-handle}/groups/{name}",
+  "display_name": "<human-readable name>",
+  "group_class": "resource_grouping",
+  "description": "<purpose of this group>",
+  "membership_policy": {
+    "auto_include": {
+      "resource_type": "Compute.VirtualMachine",
+      "tags": { "team": "payments", "env": "production" }
+    }
+  }
+}
+
+Response 201 Created:
+{
+  "group_uuid": "<uuid>",
+  "handle": "tenant/payments/groups/prod-vms",
+  "status": "active"             # resource groups activate immediately (no policy review)
+}
+```
+
+### 9.3 List Contributions
+
+```
+GET /api/v1/contribute
+X-DCM-Tenant: <tenant-uuid>
+
+Query parameters:
+  artifact_type=<policy | resource-group | catalog-item>
+  status=<proposed | active | deprecated>
+
+Response 200:
+{
+  "contributions": [
+    {
+      "contribution_uuid": "<uuid>",
+      "artifact_type": "policy",
+      "handle": "tenant/payments/gatekeeper/cost-ceiling",
+      "status": "proposed",
+      "shadow_mode": true,
+      "pr_url": "https://...",
+      "submitted_at": "<ISO 8601>",
+      "review_status": "pending"
+    }
+  ]
+}
+```
+
+### 9.4 Withdraw Contribution
+
+```
+DELETE /api/v1/contribute/{contribution_uuid}
+
+Response 200:
+{
+  "contribution_uuid": "<uuid>",
+  "status": "withdrawn",
+  "pr_closed": true
+}
+```
+
+
 ## 8. Conformance Levels
 
 The Consumer API defines three conformance levels, mirroring the Operator Interface Specification model:
 
 **Level 1 — Read-Only:** Catalog browsing, resource listing, status queries, search, cost estimates, quota views, and notification listing. No request submission or resource management. Suitable for reporting, dashboards, and read-only portal integrations.
 
-**Level 2 — Standard:** All Level 1 operations plus request submission, status tracking, approvals, and basic resource management (update editable fields, suspend/resume, decommission, bulk decommission, TTL extension, group management). Required for all self-service portal implementations.
+**Level 2 — Standard:** All Level 1 operations plus request submission, status tracking, approvals, basic resource management (update editable fields, suspend/resume, decommission, bulk decommission, TTL extension, group management), and consumer contribution endpoints (policy authoring, resource group definitions). Required for all self-service portal implementations.
 
 **Level 3 — Full:** All Level 2 operations plus rehydration, ownership transfer, drift management (acknowledge, accept, revert), audit trail access, correlation queries, webhook subscription management, and cost actuals. Required for ITSM integrations, compliance tooling, and full GitOps automation.
 

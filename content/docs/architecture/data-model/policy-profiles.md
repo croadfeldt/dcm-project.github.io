@@ -57,6 +57,19 @@ Policy Providers   — external authoritative policy sources
 
 ---
 
+## 1b. Policy Authorship — Federated Contribution Model
+
+Policies in DCM are not exclusively authored by platform admins. The DCM federated contribution model enables all actor types to author policies within their permitted domain scope:
+
+- **Platform admins** — all domains, all policy types
+- **Consumers / Tenant admins** — tenant domain policies (GateKeeper, Transformation, Recovery, Lifecycle, Orchestration Flow, Governance Matrix rules scoped to their Tenant)
+- **Service Providers** — provider-domain GateKeeper and Validation policies for their resource types
+- **Peer DCM instances** — policy templates contributed through verified federation relationships
+
+This is not a special case — it is the standard GitOps PR model applied to all contributor types. Consumer-authored policies go through the same lifecycle (developing → proposed → active) with appropriate review requirements per the active profile. See [Federated Contribution Model](28-federated-contribution-model.md) for the complete specification.
+
+---
+
 ## 2. Policy Groups
 ## 1a. Two-Dimensional Profile Model
 

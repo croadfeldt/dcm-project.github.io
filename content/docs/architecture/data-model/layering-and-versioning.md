@@ -268,6 +268,23 @@ For Model A: entity record alone is sufficient
 
 ---
 
+
+### 2a. Layer Contributors
+
+Every layer type has a declared contributor type. The contributor determines what review is required before the layer becomes active in assembly. See [Federated Contribution Model](28-federated-contribution-model.md) Section 3 for the full contributor permission table.
+
+| Layer Type | Contributor | Domain | Review |
+|-----------|-------------|--------|--------|
+| Base Layer | Platform Admin | system | auto |
+| Core Layer | Platform Admin | platform | auto |
+| Intermediate / Customization Layer | Platform Admin, Consumer/Tenant | platform, tenant | per profile |
+| Service Layer | Platform Admin, Service Provider | provider | human_review (standard+) |
+| Request Layer | Consumer/Tenant | tenant | auto (applied directly to request) |
+| Policy Layer | All contributor types | per contributor role | per profile + contributor type |
+
+The Request Layer is the only layer type that does not require a PR review — it is a consumer's direct field declarations on a specific request. All other layers flow through the GitOps PR model.
+
+
 ## 3. Layer Types
 
 DCM defines six layer types. Each has a distinct purpose, scope, ownership model, and position in the assembly precedence chain.

@@ -1,7 +1,7 @@
 ---
 title: "DCM Foundational Abstractions"
 type: docs
-weight: -10
+weight: 0
 ---
 
 > **⚠️ Active Development Notice**
@@ -72,6 +72,7 @@ This is the complete DCM operational model. Everything else is a typed specializ
 - **Provenance** — every field in every Data artifact carries lineage metadata describing its origin and all modifications
 - **Data classification** — every field carries a classification (public → classified) governing what may cross interaction boundaries
 - **Immutability if versioned** — once a version is published, it cannot be modified; changes produce new versions
+- **Contributor identity** — every Data artifact records who contributed it (platform admin, consumer/tenant, service provider, or peer DCM) and what review it received before activation. DCM defaults to a federated contribution model — all authorized actor types can create Data within the bounds their role permits. See [Federated Contribution Model](28-federated-contribution-model.md).
 
 **The complete Data taxonomy:**
 
