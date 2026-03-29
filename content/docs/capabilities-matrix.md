@@ -294,6 +294,21 @@
 ---
 
 
+## 22. Meta Provider Composability
+
+| ID | Capability | Consumer | Service Provider | Platform/Admin | Depends On |
+|----|-----------|---------|---------|---------------|-----------|
+| MPX-001 | Compound Service Request | Request a compound service as a single catalog item; receive composite entity UUID; track compound execution status via standard request status endpoint | Register as Meta Provider with constituent specification; implement compound dispatch endpoint | Configure Meta Provider registration; manage composite service catalog items | CAT-001, REQ-007, PRV-001 |
+| MPX-002 | Dependency-Ordered Constituent Execution | — | Execute constituents in declared dependency order; manage parallel rounds; respect depends_on declarations | Configure composition model; monitor execution round progress via status events | MPX-001, PRV-003 |
+| MPX-003 | Partial Delivery and DEGRADED State | Receive DEGRADED composite entity when partial delivery is accepted; choose to accept or reject degraded state | Declare partial_delivery_supported and required_for_delivery per constituent; return DEGRADED compound payload | Configure accept_degraded_delivery per profile; manage degraded notification urgency | MPX-001, PRV-005 |
+| MPX-004 | Compound Compensation | Receive notification and recovery decision when compound service fails; approve or reject compensation | Implement compensation in dependency-reverse order; guarantee idempotent decommission calls | Configure compensation timeout; manage PARTIALLY_COMPENSATED orphan detection | MPX-001, LCM-007, DRC-001 |
+| MPX-005 | Transparent Constituent Visibility | Query and manage DCM-visible constituent entities independently (when transparency mode); receive constituent-level drift alerts | Declare composition_visibility mode; register transparent constituents with deterministic UUIDs | Configure visibility mode per compound resource type; manage constituent entity lifecycle policies | MPX-001, DRF-001 |
+| MPX-006 | Compound Execution Status Tracking | Monitor compound execution round progress via request status; see component-level status during long-running compositions | Send intermediate status events to DCM during execution; declare status_reporting.interval | Monitor compound execution health; configure execution timeout alerts | MPX-001, REQ-008 |
+| MPX-007 | Nested Meta Provider Composition | Request high-order compound services composed of other compound services (max depth 3) | Implement as a Meta Provider that calls other Meta Providers as constituents; declare max_nesting_depth | Configure nesting depth limits; manage nested compensation chains | MPX-001, PRV-009 |
+
+---
+
+
 ## Capability Count Summary
 
 | Domain | Capabilities |
@@ -319,7 +334,8 @@
 | Drift Reconciliation | 5 |
 | Federated Contribution Model | 7 |
 | Scoring Model | 8 |
-| **Total** | **134** |
+| Meta Provider Composability | 7 |
+| **Total** | **141** |
 
 ---
 

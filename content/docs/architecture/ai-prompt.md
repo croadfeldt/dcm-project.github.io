@@ -4263,143 +4263,76 @@ SMX-001 through SMX-008 in Capabilities Matrix Domain 21. Total: 134 capabilitie
 
 ---
 
-## SECTION 62 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 62 — META PROVIDER COMPOSABILITY MODEL (doc 30)
 
-When working on this project, follow these instructions:
+### What a Meta Provider Is
+A **compound Service Provider** that uses other providers in the DCM catalog to fulfill a higher-order service. Its primary contribution is a **compound service definition** declaring constituent resource types, dependencies, and delivery requirements so DCM can place, sequence, and govern the constituents. The Meta Provider is NOT an orchestrator — it is a compound service definition plus a standard Service Provider for its own resource types.
 
-1. **Data model is foundational** — all design decisions must be evaluated against their impact on the data model first
-2. **Four states are always relevant** — when designing any component or flow, identify which states it reads from and writes to
-3. **Provenance is non-negotiable** — any component that modifies data must record provenance; never design around this requirement
-4. **UUIDs everywhere** — every entity, definition, and data object must have a UUID; never reference by name alone
-5. **Portability first** — when designing resource types or catalog items, start with universal fields; justify any deviation toward conditional or provider-specific
-6. **Policy over hardcoding** — business logic belongs in the Policy Engine, not in component code
-7. **Declarative over procedural** — data describes state, not steps; procedures belong in providers
-8. **Universal versioning** — every definition is versioned using Major.Minor.Revision; never create an unversioned definition
-9. **Universal artifact lifecycle** — every definition must support the five-status lifecycle: `developing → proposed → active → deprecated → retired`; never design an artifact with only the old three-status model
-10. **Flag open questions** — do not make assumptions about unresolved items; surface them and ask
-11. **Documentation format** — Markdown, hierarchical structure, following the established document style
-12. **Provider agnosticism** — DCM does not care how providers accomplish their work; only the data contract matters
-13. **Layer type scoping** — Core Layers are type-agnostic; Service Layers must always be type-scoped; a Service Layer without a declared type scope is always invalid
-14. **GateKeeper is supreme** — GateKeeper policies can override anything including consumer input; this is by design for sovereignty and security enforcement; never design around it
-15. **DCM always owns the data** — regardless of operational ownership model, DCM is always the authoritative system of record for all Resource/Service Entity data and lifecycle
-16. **Tenant is mandatory** — every Resource/Service Entity must belong to exactly one Tenant; this is a non-overridable DCM System Policy; no exceptions
-17. **Ownership vs consumption** — a resource belongs to one Tenant (owner) but can be consumed by multiple Tenants via the Service Catalog; never conflate ownership and consumption
-18. **Dependencies declared in advance** — all dependencies must be declared in the data model before execution; provider-discovered runtime dependencies are not acceptable
-19. **Process Resources need provenance** — if a Process Resource modifies an Infrastructure Entity, that Entity's provenance must reference the Process Resource UUID
-20. **Two-tier policies** — DCM System Policies are non-overridable; Organizational Policies are configurable; never design a System Policy as organizational or vice versa
-21. **Check DISCUSSION-TOPICS.md first** — before designing any component or capability, check the discussion topics document for active or parked topics that may affect the design; never proceed on a topic marked 🔴 Blocking without resolution
-22. **Webhooks are unresolved** — webhook integration is under active design (DISCUSSION-TOPICS.md TOPIC-001); do not make implementation assumptions about webhook mechanics, payload format, authentication, or retry behavior until design questions are resolved; webhooks ARE confirmed as an Egress capability with Policy Engine integration
-23. **Override control belongs to Policy Engine** — the Request Payload Processor enforces structural layer rules only; field-level override control (allow/constrained/immutable) is set exclusively by the Policy Engine; never design around this boundary
-24. **Enhancement gaps are tracked** — DISCUSSION-TOPICS.md TOPIC-011 documents compatibility gaps between existing enhancement documents and the data model; when working on components covered by those enhancements, check TOPIC-011 for known gaps that need resolution
-25. **Single relationship model** — all entity relationships use the universal bidirectional model in doc 09; never create a separate binding or dependency mechanism; the entity relationship graph supersedes the dependency graph concept
-26. **Information Providers are not Service Providers** — Information Providers serve data DCM references but does not own; DCM never caches external data authoritatively; only `display_name` is cached non-authoritatively for UI convenience
-27. **Standard data only for operational decisions** — DCM core only relies on standard information type fields for lookups, policy evaluation, and operational decisions; extended fields are carried in payloads but never used for DCM core operations
-28. **DCM is a Kubernetes superset, not a replacement** — Kubernetes manages the execution plane; DCM manages the management plane; operators become DCM Service Providers through the Operator Interface Specification; never design DCM as competing with Kubernetes
-29. **Operator adapter pattern** — when an operator cannot be modified directly, an adapter implements the DCM Service Provider API on its behalf; the adapter handles Naturalization (DCM → CR) and Denaturalization (CR status → DCM); this is the standard pattern for existing operators
-30. **Conformance levels gate capabilities** — Level 1 operators get catalog and basic monitoring; Level 2 adds placement and drift detection; Level 3 adds sovereignty and brownfield ingestion; always check what level an operator has declared before assuming capabilities are available
-31. **Storage Providers define contracts, not implementations** — DCM specifies what a store must do; implementors choose the technology; never reference a specific technology (Kafka, Git, Elasticsearch) as a DCM requirement — reference the store type and contract instead
-32. **Governance is never skippable in rehydration** — all relevant policies always apply regardless of rehydration source, mode, or urgency; the only variable is current vs pinned policy version, and pinned requires elevated authorization
-33. **Audit and Observability are separate concerns** — Audit is compliance-grade, long-retention, persona-restricted; Observability is operational, short-retention, SRE-accessible; never conflate them or design them as the same component
-34. **All DCM capabilities surface through the API Gateway** — Audit, Observability, Catalog, Requests, Entities, Policies all live in a unified API hierarchy; there are no separate endpoints outside the Gateway
-35. **The Search Index is non-authoritative** — if Search Index and GitOps store disagree, Git always wins; the Search Index is a performance layer only; it can be cleared and rebuilt from Git at any time
-36. **All artifacts carry artifact metadata** — layers, policies, resource types, catalog items, provider registrations, entity definitions — everything. No artifact is exempt from the universal metadata block
-37. **created_by ≠ owned_by** — created_by is the audit record of who submitted the artifact; owned_by is the accountability record of who is responsible and receives notifications; these may be different people/teams
-38. **Conflicts are resolved at ingestion, not assembly** — all active layers in DCM are pre-validated conflict-free; the assembly process never encounters an ambiguous merge; if a conflict is found at ingestion, the PR is blocked until resolved
-39. **Priority schema is advisory for categories, mandatory for ordering** — the reference taxonomy (900=Compliance, 800=Security, etc.) is advisory and organizations may adapt it; however, the numeric comparison rule is always enforced and always deterministic
-40. **Proposed status enables shadow validation** — policy artifacts in proposed status execute in shadow mode against real traffic; output is captured in proposed_evaluation_record but never applied; this is the required validation step before activation
-65. **Universal Group Model supersedes separate grouping constructs** — all Tenants, Resource Groups, Policy Groups, and Profiles are DCMGroup entities with group_class; use the universal model for new implementations; existing UUIDs and APIs are preserved
-66. **group_class drives system behavior, group_subclass is advisory** — never design system behavior around group_subclass; only the built-in group_class values produce system-enforced behavior
-67. **Composite groups default to targeting all member types** — always declare member_type_filter when writing policies that target a composite group unless genuinely intending to govern all member types simultaneously
-68. **Nested tenant governance: most restrictive wins** — a child policy that is more restrictive than a parent policy wins; parent policies cascade where the child has no policy; this is the same principle as save_overrides_destroy and field override control
-69. **former_group_membership records are permanent** — group destruction does not erase membership history; queries against membership history are valid at any time via provenance store; use this for compliance and audit queries about past associations
-115. **Three independent field governance mechanisms cover the full lifecycle** — override_preference (assembly time: which layers can set), constraint_visibility (catalog: what consumers see), editability (post-realization: what consumers can change); all three are orthogonal and compose
-116. **Updates are targeted deltas — layers never re-run on updates** — PATCH requests validate editable fields and edit_constraints then dispatch a delta; the layer assembly chain is not re-invoked; this preserves original assembly integrity while allowing operational changes
-117. **immutable override only blocks lower-authority domains** — a platform domain immutable field blocks tenant/service/provider/request; it does not block system domain; higher authority always wins; GateKeeper can additionally lock allow/constrained fields for compliance mandates
-111. **Confidence descriptor is primary — score and band are derived** — authority_level/corroboration/source_trust/last_updated_at are stored facts; freshness/score/band computed at query time from stored facts; never stored as primary (avoids staleness); all reconstructable from audit records
-112. **source_trust drives the confidence trust_multiplier** — verified=1.00, degraded=0.75, suspended=0.00; maintained by dual-trigger trust scoring (event-triggered + weekly scheduled); push failures and schema errors degrade trust automatically
-113. **Audit and Observability answer different questions** — Audit: what happened and who authorized it; Observability: is the system healthy; different consumers, opposite storage trade-offs; Observability may reference audit record UUIDs but lives in a separate store
-114. **Curated Observability Event Stream is policy-filtered** — not raw metrics; policy governs what is published and subscriber role requirements; raw metrics.raw requires explicit policy opt-in; published events do not replace audit records
-108. **Tenant decommission is four-phase and never silent** — pre-decommission validation blocks the operation until all resources, cross-tenant relationships, compliance holds, and child groups are resolved; audit records enter post-lifecycle retention and are never destroyed
-109. **Group policy inheritance is class-specific** — tenant_boundary uses opt_out for standard/prod (parent cascades) and opt_in for fsi/sovereign; federation always opt_in; resource_grouping and policy_collection are not applicable
-110. **Relationship graph depth differs from dependency depth** — depth is graph traversal distance between any two entities, not relationship count; circular detection always enforced; profile-governed max 15 (standard/prod) or 10 (fsi/sovereign)
-105. **Profiles have two independent dimensions** — posture (how DCM infrastructure behaves) and compliance domain (which regulatory frameworks apply); compose them freely; a hospital uses hipaa-prod = posture-prod + compliance-hipaa; a defense contractor uses dod-il4 = posture-sovereign + compliance-dod-il4 + compliance-fedramp-high + compliance-nist-800-53
-106. **Compliance domain groups apply at Tenant level** — one DCM deployment can host clinical Tenants (HIPAA), billing Tenants (HIPAA + PCI-DSS), and admin Tenants (standard) simultaneously; compliance_groups in tenant_config are additive to the platform profile
-107. **HIPAA group enforces PHI minimum necessary** — Mode 4 data_request_spec is limited to minimum PHI fields; providers handling PHI must declare baa_in_place in sovereignty_declaration; audit retention is P6Y regardless of profile default; breach notification triggers via sovereignty_violation_record
-101. **Provenance model is configurable — Model B is recommended for standard+** — organizations choose full_inline (simple, high storage), deduplicated/Model B (content-addressed dedup, lossless, 95-99% storage reduction), tiered (hot/warm/cold), or combined; swap the active provenance Policy Group to change
-102. **Shadow evaluation records go to Validation Store — not Audit Store** — Validation Store is queryable and modifiable (records marked reviewed); links to Audit Store via audit_record_uuid; P90D retention after policy promotion/retirement
-103. **Policy minimum review periods are DCM-enforced** — not guidelines; GateKeeper=14d, Validation=7d, Transformation=3d × profile multiplier; emergency bypass requires dual-approval audit
-104. **Artifact status extensions are not permitted** — the five statuses are invariant; use status_metadata for workflow state (no system behavior); policy gates transitions based on status_metadata values
-97. **Confidence scoring is computed by DCM — never self-declared** — the formula (base_score × freshness × corroboration × authority) is standardized and auditable; policies work on bands (very_high/high/medium/low/very_low) not raw values
-98. **Information Provider authority is layer-defined** — static organizational knowledge ("our CMDB is authoritative for business unit") belongs in a platform domain layer; conflict detection happens at ingestion time; policy governs automated resolution
-99. **DCM Provider is the ninth provider type** — always mTLS (non-configurable); sovereignty checks mandatory; local policies govern ALL federated resources; audit records in both DCM instances with shared correlation_id
-100. **Provider federation eligibility is layer-defined with policy enforcement** — platform layer sets defaults per provider type; individual registrations may be more restrictive; storage providers default to mode: none; remote DCMs cannot decommission local resources through tunnels
+### Key Principle
+The Meta Provider declares the dependency graph. DCM executes it. Parallelism emerges from the graph — constituents with no unresolved dependencies dispatch concurrently. The Meta Provider does not manage sequencing, external placement, failure handling, or compensation.
+
+### provided_by (critical field on each constituent)
+- `self` — Meta Provider handles this constituent via standard Services API (naturalize/execute/denaturalize — same as any Service Provider)
+- `external` — DCM places with best available provider via Placement Engine (all sovereignty/accreditation/trust checks apply)
+- `<provider_uuid>` — DCM dispatches to specific named provider
+
+### depends_on → Execution Order
+Each constituent declares `depends_on: [component_id, ...]`. DCM reads this graph and dispatches in order — no dependencies first, then those whose dependencies are REALIZED. Parallelism within a round emerges from the graph. Meta Provider does NOT manage this.
+
+### required_for_delivery
+- `required` — failure triggers Recovery Policy; unrealized constituents cancelled
+- `partial` — failure noted; compound continues; composite status may be DEGRADED
+- `optional` — failure noted; execution continues unaffected
+
+### Division of Responsibility (authoritative — see doc 30 Section 4)
+**DCM:** catalog, layer assembly, policy/scoring, external placement (Placement Engine), dependency-ordered dispatch, failure handling (Recovery Policy), compensation (dependency-reverse decommission), composite Realized State assembly, drift detection, audit, lifecycle.
+**Meta Provider:** declares compound service definition; executes `self` constituents as standard Service Provider; implements standard decommission for `self` constituents.
+
+### Composite Entity Four States
+- **Intent:** Compound request stored as-is; no constituent expansion
+- **Requested:** DCM expands using compound service definition; Placement Engine resolves `external` providers; constituent blocks have component_id, provided_by, depends_on, required_for_delivery
+- **Realized:** DCM assembles from all constituent realized payloads; composite_status; synthesized composite_fields
+- **Discovered:** Via Meta Provider endpoint (opaque/selective) or per-constituent providers (transparent)
+
+### Composite Status — determined by DCM
+- `REALIZED` — all required constituents REALIZED
+- `DEGRADED` — required REALIZED; partial(s) failed; accepted if profile permits
+- `FAILED` — required constituent(s) failed → Recovery Policy → compensation in dependency-reverse order
+
+### Composition Visibility
+- `opaque` — top-level entity only; discovery via Meta Provider endpoint
+- `transparent` — all constituents as DCM entities; UUIDs = deterministic(parent_uuid + component_id); per-constituent drift detection
+- `selective` — declared sub-set as DCM entities
+
+### Rehydration
+Primary use case for dependency graph declaration. DCM sequences rehydration from `depends_on` graph in same order as provisioning. `external` constituents re-placed by Placement Engine. `self` constituents return to same Meta Provider.
+
+### Scoring
+Operational GateKeepers fire on compound payload (not per-constituent). Signal 5 (accreditation richness) = lowest richness score among required-constituent providers.
+
+### Nested Meta Providers
+Max depth 3 enforced by DCM at placement. Nested Meta Provider has no awareness it is a constituent — receives and responds with standard payloads.
+
+### MPX-001–MPX-008 System Policies
+MPX-001: self constituents use standard Services API. MPX-002: DCM derives ordering from depends_on. MPX-003: parallelism from graph, not Meta Provider. MPX-004: composite status determined by DCM. MPX-005: Recovery Policy governs failure/compensation. MPX-006: external placement by Placement Engine only. MPX-007: transparent UUIDs are deterministic. MPX-008: max nesting depth 3 enforced at placement.
+
+### Capabilities: MPX-001–MPX-007 (Domain 22 — 141 total across 22 domains)
+
+## SECTION 63 — WORKING INSTRUCTIONS FOR AI MODELS
+
+When working on this project, apply these instructions in addition to the numbered guidance in SECTION 60 (Documentation Structure):
 
 172. **DCM defaults to federated data creation** — platform admins are not the only contributors; consumers author tenant-domain policies; providers publish resource type specs and service layers; peer DCMs contribute registry entries; all via GitOps PR with profile-governed review
 173. **Contributor domain scope is hard DENY at submission** — consumers cannot contribute system/platform policies regardless of declared domain; providers cannot contribute specs for types they don't offer; enforced by Governance Matrix at contribution time (FCM-002)
 174. **All contributed policies enter shadow mode by default** — proposed status with shadow evaluation before activation; shadow_review_period is profile-governed (P7D standard → P30D fsi/sovereign); platform admin reviews divergence cases before promoting
+175. **Orphaned artifacts do not auto-deactivate** — when contributor's access is revoked, their active artifacts remain active until platform admin assigns new owner or explicitly retires; exception: sovereign profile auto-retires orphaned artifacts (FCM-006)
 176. **GateKeeper enforcement_class is required and fail-safe** — if omitted, treated as compliance (boolean deny). Operational-class GateKeepers never halt the request; they contribute a weighted risk_score_contribution to the aggregate. The aggregate risk score determines approval routing, not individual policy outcomes.
 177. **Validation output_class is required and fail-safe** — if omitted, treated as structural (boolean halt). Advisory-class Validations never halt requests; they accumulate completeness score and warning list surfaced to the consumer.
 178. **Governance Matrix is always boolean — never scored** — SMX-004 is absolute. Scoring cannot be used to route around data sovereignty or regulatory boundaries. The Governance Matrix evaluates before the scoring pipeline runs.
 179. **Profile thresholds determine routing, not individual policies** — the approval routing decision (auto/review/dual/committee) emerges from the aggregate risk score crossing profile-configured thresholds, not from individual policy flags. Changing governance sensitivity = adjusting thresholds in the profile.
 180. **SMX-008 is a hard system constraint** — auto_approve_below may never exceed 50 in any profile. Platform admins cannot override this. Profiles submitted with auto_approve_below > 50 fail validation.
-175. **Orphaned artifacts do not auto-deactivate** — when contributor's access is revoked, their active artifacts remain active until platform admin assigns new owner or explicitly retires; exception: sovereign profile auto-retires orphaned artifacts (FCM-006)
-93. **Process Resource max_execution_time is mandatory** — it is not optional metadata; enforced by the Lifecycle Constraint Enforcer; profile governs the default on_max_exceeded action (notify/escalate/terminate)
-94. **Dependency graphs are embedded, not separate entities** — declared graph in Resource Type Specification; resolved graph in placement.yaml (Requested State); realized graph in Realized State events; no separate dependency graph artifact needed
-95. **Billing state is first-class — not metadata** — DCM carries the billing_state field; policy determines the billing model per resource type and state; Cost Analysis consumes it; organizations decide what is billable
-96. **Meta Provider composition_visibility governs DCM's view** — opaque means DCM only sees what the provider reports; transparent means all sub-resources are full DCM entities with drift detection; selective is the middle ground
-89. **Provider sovereignty is a contractual obligation** — every provider registration requires sovereignty_declaration; changes must be notified within declared SLA; DCM treats sovereignty changes as drift and re-evaluates placement; auto-migration available via Provider-Portable Rehydration
-90. **Git PR ingress actors resolve through the same Auth Provider as all other users** — DCM trusts the Git server's authentication assertion; git config user.email is ignored (spoofing vector); the resolved actor has IDENTICAL roles/groups/tenant scope to web UI login for the same user; unresolvable identities are always rejected with an actionable PR comment
-91. **Storage Provider sub-types are distinct** — Search Index (non-authoritative, rebuildable, consistency lag declared) and Audit Store (append-only, hash chain, reference-based retention, compliance queries) are separate sub-types; never treat them as interchangeable
-92. **GitOps stores use handle-based directory structure** — deterministic path from artifact identity; main is authoritative; monorepo acceptable for minimal/dev; separate repos for standard+
-85. **Layers are data, policies are logic — never conflate them** — if a policy repeatedly injects the same static value, that value belongs in a layer; if a layer contains conditional evaluation logic, that logic belongs in a policy; the flow is strictly unidirectional (layers Steps 1-4, policies Steps 5-9)
-86. **Layer domains mirror policy domains** — system > platform > tenant > service > provider > request; same authority model, same override precedence; lower cannot override higher
-87. **Layer Groups use DCMGroup group_class: layer_grouping** — same universal group model as policy_collection; enables discovery, composition, and governance of related layers
-88. **activation_condition enables conditional layer inclusion** — evaluated in Step 2; can reference request fields, tenant attributes, resource type, resolved core layer fields, and ingress fields; condition false = layer excluded = recorded in provenance
-81. **Registry governance is PR-based and policy-governed** — proposals are Pull Requests with automated validation gates; shadow validation in proposed status is mandatory before active; the Registry Provider is fully policy-governed with profile-appropriate policy groups
-82. **Deprecation defaults are policies — not hard-coded values** — REG-DP-001 through REG-DP-007 are overridable via standard priority; FSI/sovereign profiles lock sunset periods as immutable; REG-DP-005 (retired rejects new requests) is structural and never overridable
-83. **Version constraints are strictly enforced — no silent upgrades** — DCM never auto-upgrades across major versions; version_policy governs flexibility within that constraint; profile sets the default policy
-84. **Cost analysis ranks above least-loaded in tie-breaking** — cost is a business decision; but only if Cost Analysis has current data and cost is determinable; skip silently if not; consistent hash is always the final deterministic tiebreaker
-75. **Eight provider types — not five** — Message Bus Provider (6), Credential Provider (7), and Auth Provider (8) complete the ecosystem; all follow the same base contract
-76. **The ingress block is the policy surface for all access control** — every request carries surface, protocol, authenticated_via, actor.roles, actor.auth_provider_type, mfa_verified, and external_identity claims; GateKeeper policies act on all of these
-77. **No anonymous access in any profile** — minimal profile uses static API key (30 seconds to set up); the authentication ladder is about setup effort, not whether auth exists; AUTH-008 is non-negotiable
-78. **Credentials always via Credential Provider** — no plaintext credentials anywhere in DCM: not in Git, not in audit records, not in logs; always reference a Credential Provider secret_path
-79. **Auth Providers are versioned artifacts** — role_mapping and tenant_mapping changes go through proposed → active validation; Auth Provider config changes are audited; multiple providers can be registered simultaneously with signal-based routing
-80. **Webhook registrations are versioned artifacts** — Git-managed, lifecycle-governed, schema adapters for long-lived compatibility; inbound callers must be registered as webhook actors with explicit permissions
-71. **Two-stage audit: Stage 1 is the durability guarantee** — the Commit Log quorum write confirms the change is audited; Stage 2 enrichment is asynchronous; Stage 1 timestamp is the authoritative audit timestamp (AUD-013)
-72. **Redundancy is profile-governed — not per-component** — never configure replica counts individually; activate the appropriate Profile and it configures redundancy for the entire deployment
-73. **DCM is self-hosting** — DCM's own deployment is a DCM resource; DCM manages itself through the same four-state model, policy engine, and audit trail used for customer workloads
-74. **Everything is containerized** — no bare-metal DCM components; all components run as Kubernetes pods following the standard pod security model; state is always in external stores (stateless control plane)
-65. **All DCM grouping uses DCMGroup with group_class** — there is no separate Tenant entity, Resource Group entity, or Policy Group entity; they are all group_class values; use the class-filtered API views for backward compatibility
-66. **Composite groups apply to all member types by default** — always use member_type_filter when targeting a composite group with a policy that should apply only to specific member types
-67. **Nested Tenants inherit governance from parent — not ownership** — a resource always belongs to its leaf tenant_boundary group; the parent has governance overlay and cost rollup only; GRP-INV-004 is non-overridable
-68. **Every change produces an audit record — no exceptions** — the WAL guarantees delivery; WAL write failure aborts the change; no silent unaudited changes are possible
-69. **Audit retention is reference-based — not time-based** — a 7-year retention policy means 7 years AFTER all referenced entities retire; a record created 20 years ago is retained unconditionally if any referenced entity is still operational
-70. **The audit hash chain is tamper-evident** — any insertion, modification, or deletion of a historical record breaks the chain; verification is a first-class DCM operation; chain breaks trigger security alerts
-63. **Mode 4 Policy Providers are query-response interfaces** — logic lives externally; DCM sends minimized data, receives decision and/or enrichment; data sovereignty check always runs before any query is dispatched; default failure behavior is gatekeep
-64. **Mode 4 enrichment fields carry full provenance** — source_type: black_box_provider, source_uuid, and audit_token; override control applies; a GateKeeper can refuse enrichment on sensitive fields; enrichment providers require transformation trust level minimum
-57. **Policy Profiles are the primary configuration mechanism** — most deployments activate a built-in profile and add organization-specific groups; do not configure individual policies from scratch when a profile covers the use case
-58. **Policy Groups are the unit of reuse** — when designing policies for a concern, package them as a group; groups can be shared across profiles and inherited by other groups
-59. **Policy Providers are the fifth provider type** — they follow the same base contract; trust level determines max policy authority; untrusted providers are advisory only; trusted requires dual approval elevation
-60. **Cross-tenant default is explicit_only** — informational sharing is NOT open by default; every cross-tenant relationship of any nature requires a cross_tenant_authorization record; this supersedes the earlier operational_only default
-61. **Lifecycle time constraints are first-class fields** — they follow standard precedence and override control; GateKeeper can lock them immutable; expiry enforcement is a DCM control plane function not a provider concern
-62. **Rehydration cannot bypass tenancy or sovereignty** — policy_version: pinned only governs resource configuration policies; tenancy and sovereignty always use current policies; conflicts produce PENDING_REVIEW state
-53. **Shared resources use reference counting** — DCM maintains active_relationship_count; destructive actions are deferred until the count reaches minimum_relationship_count per REL-015; informational relationships never count (REL-016)
-54. **Save overrides destroy — always** — the lifecycle action hierarchy (retain > notify > suspend > detach > cascade > destroy) resolves all multi-parent lifecycle conflicts deterministically; retain always wins per REL-018; this is non-negotiable
-55. **Lifecycle conflicts are recorded, not silently resolved** — lifecycle_conflict_record created whenever multiple different action recommendations exist; warning/critical severity triggers notifications; info severity is logged only
-56. **shareability.allowed: false blocks multiple relationships at type level** — non-shareable resource types (e.g., boot disks) reject second constituent/operational relationships at request time per REL-017; check Resource Type Specification before designing multi-parent relationships
-49. **Assembly is nine steps not seven** — steps 1-4 (layers), step 5 (pre-placement policies), step 6 (Placement Engine loop), step 7 (post-placement policies), step 8 (Requested State storage), step 9 (dispatch); always use the correct step number when discussing assembly
-50. **Reserve query is atomic** — it simultaneously verifies constraints, returns metadata, and places a resource hold; it is the primary placement query inside the loop; non-hold queries (capacity, metadata, constraint_verification) are available outside the loop for informational purposes
-51. **Missing metadata is a policy concern only** — DCM has no built-in opinion about metadata sufficiency; if no policy declares required_context for an absent field, the result is implicit_approval; implicit approvals are recorded explicitly in policy_gap_records
-52. **Placement Engine is a named component** — it is a peer to the Policy Engine, not subordinate to it; it owns the placement loop, candidate scoring, reserve query dispatch, and hold management
-45. **Ingestion model is the unified mechanism** — V1 migration and brownfield ingestion are the same three-step pattern: ingest → enrich → promote; use the same ingestion_record structure, same __transitional__ Tenant, same governance policies regardless of source
-46. **`__transitional__` Tenant is a system artifact** — never design around it for normal operations; it exists only as a migration/ingestion holding area; entities there are governance liabilities to be resolved
-47. **Ingested entities have capability restrictions** — INGESTED and ENRICHING state entities cannot be parents for allocated resource claims or hard dependencies for new requests; always check ingestion state before designing dependencies
-48. **Promotion is the lifecycle gate** — an entity is not a full DCM citizen until it reaches PROMOTED state; before that it is in a holding state with restricted capabilities
-41. **Lifecycle policy fields on relationships are just fields** — they carry the same override metadata and resolve under the same Policy Engine authority hierarchy as any other DCM field; no special conflict resolution mechanism
-42. **Relationship type × nature matrix is explicit and enforced** — invalid combinations are rejected at request time per REL-013; the matrix is the authoritative source for valid relationship combinations
-43. **Cross-tenant relationships are governed by nature** — constituent never crosses tenant boundaries; operational requires dual authorization; informational is permitted unless deny_all; hard_tenancy declaration on the Tenant entity controls the boundary
-44. **Allocated resources are first-class entities** — a consuming Tenant gets its own UUID, lifecycle, and governance; the relationship is depends_on + operational + cross_tenant; the parent pre-defines available allocations; DCM tracks active allocations on the parent with notification endpoints — they carry the same override metadata and resolve under the same Policy Engine authority hierarchy as any other DCM field; there is no special conflict resolution mechanism for lifecycle policies; REL-008 and REL-009 are the only relationship-specific system policies that add constraints beyond the standard model
-
----
-
-*This prompt script is a living document. Update it whenever architectural decisions are made or open questions are resolved.*
+181. **Meta Provider is a compound service definition + standard Service Provider** — not an orchestrator. It declares the dependency graph so DCM can place, sequence, and govern constituents. For `self` constituents it executes as any Service Provider does. DCM handles all orchestration, placement, failure, and compensation.
+182. **Composite Entity has ONE entity UUID** that links Intent, Requested, Realized, and Discovered states; the UUID is assigned at Intent creation and is stable throughout the lifecycle including rehydration
+183. **DEGRADED is a valid terminal state** — not an error; a DEGRADED entity enters standard OPERATIONAL lifecycle; profile governs whether degraded delivery is accepted; Recovery Policy governs failure/compensation decisions
+184. **Parallelism emerges from the dependency graph** — constituents with no unresolved dependencies dispatch concurrently within DCM's pipeline; the Meta Provider does not manage this
+185. **provided_by: external constituents are placed by DCM's Placement Engine** — all governance controls (sovereignty, accreditation, trust) apply; the Meta Provider has no influence over external constituent provider selection

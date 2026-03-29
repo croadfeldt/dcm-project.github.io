@@ -1,5 +1,5 @@
 ---
-title: "DCM — Unified Provider Contract"
+title: "Unified Provider Contract"
 type: docs
 weight: -9
 ---
@@ -264,24 +264,45 @@ storage_provider_capabilities:
 
 ### 7.4 Meta Provider
 
-**What it does:** Composes multiple child providers to deliver a compound service as a single catalog item.
+**What it does:** Composes multiple child providers to deliver a compound service as a single catalog item. The Meta Provider declares a compound service definition — constituent resource types, dependencies, and delivery requirements — so DCM can place, sequence, and govern the constituents. For its own resource types (`provided_by: self`), the Meta Provider executes as a standard Service Provider. All orchestration, placement, sequencing, failure handling, and compensation is performed by DCM using the declared dependency graph.
 
-**Capability declaration extension:**
+> **Full specification:** See [Meta Provider Composability Model](30-meta-provider-model.md) for the complete orchestration contract, four-state model, failure propagation, compensation, and system policies (MPX-001–MPX-008).
+
+**Capability declaration extension (summary — full schema in doc 30):**
 ```yaml
 meta_provider_capabilities:
-  constituent_provider_types: [service_provider, information_provider]
-  composition_model: sequential | parallel | conditional
+  constituent_provider_types: [service_provider, information_provider, meta_provider]
+  composition_model:
+    execution: dependency_ordered    # sequential | parallel | dependency_ordered
+    max_concurrent_realizations: 10
+    max_constituent_count: 20
+    max_nesting_depth: 3
   partial_delivery_supported: true
-  compensation_supported: true
+  compensation_supported: true      # required if partial_delivery_supported: true (MPX-001)
+  compensation_timeout: PT30M
+  idempotency_guaranteed: true
+  status_reporting:
+    supported: true
+    interval: PT30S
   resource_types_composed:
     - fqn: ApplicationStack.WebApp
+      version: "2.0.0"
       constituents:
-        - Compute.VirtualMachine
-        - Network.IPAddress
-        - DNS.Record
+        - resource_type: Compute.VirtualMachine
+          required_for_delivery: required
+        - resource_type: Network.IPAddress
+          required_for_delivery: required
+        - resource_type: DNS.Record
+          required_for_delivery: partial
+      composition_visibility: selective   # opaque | transparent | selective
 ```
 
-**Data direction:** DCM sends compound service payload → Meta Provider orchestrates constituent providers → aggregates realized states → returns compound realized state.
+**Composite status determination:**
+- `REALIZED` — all required constituents succeeded
+- `DEGRADED` — required constituents succeeded; one or more partial constituents failed (accepted if `partial_delivery_supported: true`)
+- `FAILED` — one or more required constituents failed → compensation executes
+
+**Data direction:** DCM sends fully assembled compound payload → Meta Provider orchestrates constituents in dependency order → aggregates realized states → returns compound realized state to DCM.
 
 ---
 

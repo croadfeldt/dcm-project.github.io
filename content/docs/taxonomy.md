@@ -79,6 +79,21 @@ The DCM taxonomy defines the precise vocabulary used throughout the architecture
 | **Reserve Query** | A parallel capacity query sent to all eligible provider candidates. Providers confirm capacity and hold it for PT5M. The Placement Engine selects the winner and releases other holds. |
 
 
+
+### Meta Provider Composability Terms
+
+| Term | Definition |
+|------|-----------|
+| **Composite Entity** | A DCM entity produced by a Meta Provider. Exists across all four states as a single entity aggregating constituent Resource Entities. Has one entity UUID that links it through all states. |
+| **Constituent** | A sub-resource within a compound service that a Meta Provider provisions. Declared with a `component_id`, `resource_type`, `depends_on`, and `required_for_delivery` classification. |
+| **required_for_delivery** | Constituent delivery classification: `required` (failure halts the compound service and triggers compensation), `partial` (failure produces DEGRADED but not FAILED), `optional` (failure is noted but ignored). |
+| **Composite Status** | Top-level outcome of a compound service execution: `REALIZED` (all required constituents succeeded), `DEGRADED` (required succeeded; partial(s) failed; accepted if profile permits), `FAILED` (required constituent(s) failed; triggers compensation). |
+| **Compensation** | Ordered teardown of successfully realized constituents when a compound service cannot be delivered. Runs in dependency-reverse order. Best-effort; failures produce `PARTIALLY_COMPENSATED` with orphan detection. |
+| **Composition Visibility** | How a Meta Provider exposes its internal structure to DCM: `opaque` (top-level only), `transparent` (all constituents as DCM entities), `selective` (declared sub-set as DCM entities). |
+| **Dependency Round** | A batch of constituents that can execute in parallel because all their `depends_on` constituents are complete. Multiple rounds execute sequentially; constituents within a round execute in parallel. |
+| **MPX-001–MPX-008** | Meta Provider system policies. Key: MPX-001 (compensation required if partial delivery supported), MPX-002 (dependency-reverse decommission), MPX-006 (DEGRADED is a valid terminal state when accepted), MPX-008 (compound payload fully assembled by DCM before dispatch). |
+
+
 ### Scoring Model Terms
 
 | Term | Definition |
@@ -165,6 +180,7 @@ Terms to avoid because they introduce ambiguity. Use the precise alternatives in
 | DRC | Drift Reconciliation |
 | FCM | Federated Contribution Model |
 | SMX | Scoring Model |
+| MPX | Meta Provider Composability |
 
 ---
 
