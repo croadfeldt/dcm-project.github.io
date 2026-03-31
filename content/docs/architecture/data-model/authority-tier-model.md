@@ -1,8 +1,4 @@
----
-title: "Authority Tier Model"
-type: docs
-weight: 32
----
+# DCM Data Model — Authority Tier Model
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — Authority Tier Specification
@@ -430,7 +426,7 @@ Security degradations block tier registry activation. The blocking gate requires
 This is the same pattern as the standard approval pipeline — DCM provides the gate; the organization provides the review process. The difference is that the required tier for the degradation review is always at least `verified`, regardless of the profile in use.
 
 ```
-POST /api/v1/admin/tier-registry/{change_uuid}/accept-degradation
+POST /api/v1/admin/tier-registry/{change_uuid}:accept-degradation
 
 {
   "affected_item_uuid": "<uuid>",

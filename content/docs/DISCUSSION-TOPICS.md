@@ -27,6 +27,15 @@
 - Multi-cloud federation model — extending DCM federation to public cloud providers
 - GitOps PR UX improvements — better tooling for policy review workflow
 
+
+### 5. Kessel Integration (pre-implementation evaluation)
+- Evaluation document written: `44-kessel-integration-evaluation.md`
+- **Action required:** Discussion with Kessel development team to validate assumptions before any implementation work begins
+- Key questions: API stability, sovereign/air-gapped deployment model, SpiceDB schema extensibility, resource type registry extensibility, HA/DR patterns
+- **Do not implement until alignment confirmed** — document is for discussion only
+- Two integration paths evaluated: Kessel Relations as Auth Provider (checks 1-2 of five-check model), Kessel Inventory as Discovered State Storage Provider
+- 10 blocking items identified in doc 44 Section 10
+
 ### 4. Governance Questions
 - Community governance model — how will the DCM project make decisions once public?
 - Certified Profile Program — self-certified vs project-reviewed for compliance profiles
@@ -541,3 +550,28 @@ Copy the following template and fill in the fields:
 ---
 
 *This document is maintained by the DCM Project team. Add topics freely — no topic is too small if it needs a decision.*
+
+---
+
+### 6. Universal Lightspeed Interface for Operations (future concept)
+
+**Note captured for future exploration.**
+
+A universal operations interface concept — working title "Lightspeed" — for DCM. Intent is a unified, high-velocity operational surface for all DCM actions regardless of the underlying provider, resource type, or lifecycle stage. Think of it as the operational equivalent of what the unified data model is to data: a single consistent interaction model for humans and automation alike across the full DCM estate.
+
+**Initial thoughts to explore:**
+- Single interface for any operation on any resource managed by DCM — no provider-specific tooling, no context switching
+- "Lightspeed" implies minimal friction: operations that currently take multiple steps, approvals, and tool handoffs should be expressible and executable in a single interaction
+- Applicable to both human operators (Web UI / CLI) and automation (agentic workflows, AIOps)
+- Likely surfaces DCM's existing policy engine, lifecycle model, and unified data model as the execution layer — the interface is the innovation, not new backend capability
+- Could be the primary surface for DCM's "AI Ready" design principle (README): agentic workflows operating over DCM's control plane via a natural-language-capable interface that still enforces all policy, sovereignty, and accreditation constraints
+
+**Questions to answer when this gets scoped:**
+- Is this a new GUI surface, a CLI, an AI agent interface, or all three?
+- How does it relate to the existing Web UI spec and Flow GUI spec?
+- What does "lightspeed" mean operationally — sub-second execution, zero-confirmation for pre-approved patterns, predictive pre-staging?
+- How does it interact with the Authority Tier model — can it auto-route approval gates without interrupting the operator's flow?
+- Is this the primary interface for the AIOps layer referenced in the README?
+
+**Status:** Concept note — no design work started. Capture for roadmap planning.
+

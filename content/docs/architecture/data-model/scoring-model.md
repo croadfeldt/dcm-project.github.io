@@ -1,14 +1,5 @@
----
-title: "Hybrid Scoring Model"
-type: docs
-weight: 29
----
+# DCM Data Model — Hybrid Scoring Model
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. This document specifies the hybrid scoring model — a first-class architectural addition approved in the DCM architecture review. It extends the Policy Engine and Profile system without replacing any existing components.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — Scoring Model Specification
@@ -279,7 +270,19 @@ accreditation_weights:
   pci_dss: 25
   sovereign_authorization: 50
 
-# richness_score = sum(weights for held accreditations) / max_possible × 100
+# richness_score = sum(weights for held accreditations) / max_possible × 1
+
+# Verification currency multipliers (applied per accreditation, see doc 47)
+# Multiplier reduces an accreditation's weight contribution based on how recently
+# it was externally verified by the Accreditation Monitor
+verification_multipliers:
+  external_registry_verified_within_P1D:  1.0   # full weight — verified today
+  external_registry_verified_within_P7D:  0.9
+  document_verified_within_P30D:          0.85
+  contract_webhook_active:                0.9
+  expiry_only_no_external_check:          0.7   # never been externally verified
+  verification_stale:                     0.4   # check overdue
+  verification_failed_threshold_reached:  0.1   # Monitor cannot reach registry00
 # risk_contribution = (1 - richness_score/100) × 10   [lower richness = higher risk]
 ```
 
@@ -345,11 +348,11 @@ Profiles can declare tighter thresholds for specific resource types:
 ```yaml
 resource_type_threshold_overrides:
   - resource_type: "Compute.VirtualMachine"
-    auto_approve_below: 20    # tighter than profile default
+    # tier: auto, max_score: 20  # use named-tier threshold format    # tighter than profile default
   - resource_type: "Network.VLAN"
-    auto_approve_below: 10    # VLANs require more scrutiny
+    # tier: auto, max_score: 10  # use named-tier threshold format    # VLANs require more scrutiny
   - resource_type: "Storage.Volume"
-    verified_above: 40   # storage changes escalate earlier
+    # tier: verified, max_score: 40  # use named-tier threshold format   # storage changes escalate earlier
 ```
 
 ### 5.3 Tenant Threshold Overrides
@@ -360,7 +363,7 @@ Platform admins can declare Tenant-level scoring threshold adjustments:
 tenant_scoring_config:
   tenant_uuid: <uuid>
   threshold_overrides:
-    auto_approve_below: 15    # more conservative for this Tenant
+    # tier: auto, max_score: 15  # use named-tier threshold format    # more conservative for this Tenant
   signal_weight_overrides:
     actor_risk_history_weight: 0.30   # higher actor scrutiny for this Tenant
   trusted_actors:

@@ -13,6 +13,14 @@
 
 ## Abstract
 
+> **AEP Alignment:** This specification follows [AEP](https://aep.dev) conventions.
+> Custom methods use colon syntax (e.g., `POST /flow/api/v1/shadow/{uuid}:promote`).
+> List endpoints use `page_size` and `page_token` parameters.
+> The Flow GUI API is a dedicated backend for the visual tooling — it is separate from the
+> main Consumer and Admin APIs. See `schemas/openapi/dcm-consumer-api.yaml` for the
+> normative consumer-facing API specification.
+
+
 The DCM Flow GUI is the visual interface for platform engineers to compose, test, and manage DCM's data-driven orchestration. Because policies ARE the orchestration in DCM, the Flow GUI is fundamentally a **visual policy composer** — it makes the active policy graph visible and editable without requiring direct YAML or Rego authoring.
 
 The Flow GUI is a **platform engineer tool**, not a consumer tool. It operates with platform admin or policy author role permissions. Consumers interact with DCM through the Consumer API and Web UI, not through the Flow GUI.
@@ -451,7 +459,7 @@ POST /flow/api/v1/policies/{policy_uuid}/tests/from-request
 }
 
 # Run all test cases
-POST /flow/api/v1/policies/{policy_uuid}/tests/run
+POST /flow/api/v1/policies/{policy_uuid}/tests:run
 
 Response 200:
 {
@@ -639,7 +647,7 @@ Response 200:
 ### 6.4 API — Promote Shadow Policy to Active
 
 ```
-POST /flow/api/v1/shadow/{policy_uuid}/promote
+POST /flow/api/v1/shadow/{policy_uuid}:promote
 {
   "reason": "Shadow results reviewed — divergence rate acceptable; promoting to active"
 }
@@ -721,6 +729,69 @@ Response 200:
 
 ---
 
+### 7.3 API — Update Scoring Thresholds
+
+```
+PATCH /flow/api/v1/profile/scoring
+
+Authorization: Bearer <platform_admin_token>
+
+Request body:
+{
+  "thresholds": [
+    { "tier": "auto",       "max_score": 24 },
+    { "tier": "reviewed",   "max_score": 59 },
+    { "tier": "verified",   "max_score": 79 },
+    { "tier": "authorized", "max_score": 100 }
+  ],
+  "policy_overrides": [
+    {
+      "policy_uuid": "<uuid>",
+      "enforcement_class_override": "compliance",
+      "reason": "Regulatory requirement"
+    }
+  ]
+}
+
+Response 200:
+{
+  "active_profile": "standard",
+  "thresholds": [ ... ],
+  "preview": {
+    "last_7d_auto_approve_pct": 61.2,
+    "last_7d_reviewed_pct": 31.5,
+    "last_7d_verified_pct": 7.3
+  }
+}
+```
+
+**Constraint:** `auto` tier `max_score` cannot exceed 50 (SMX-008 hard cap). The API
+returns `422 Unprocessable Entity` if this constraint is violated.
+
+### 7.4 API — Payload Type Browser
+
+```
+GET /flow/api/v1/payload-types
+
+Response 200:
+{
+  "payload_types": [
+    {
+      "type": "request.initiated",
+      "description": "A new service request has been received",
+      "fields": [
+        { "path": "catalog_item_uuid", "type": "uuid", "required": true },
+        { "path": "tenant_uuid",       "type": "uuid", "required": true },
+        { "path": "fields",            "type": "object", "required": true }
+      ],
+      "policy_types_applicable": ["gatekeeper", "validation", "transformation",
+                                   "recovery", "orchestration_flow"]
+    }
+  ]
+}
+```
+
+
 ## 8. Notification Flow View
 
 ### 8.1 API — Notification Flow for an Entity
@@ -796,11 +867,39 @@ All Flow GUI API errors follow the standard DCM error format:
 
 ## 10. Conformance Levels
 
-**Level 1 — Read-Only:** Execution Graph View (read), Profile View, Payload Type Browser, Notification Flow View. Suitable for dashboards and observability integrations.
+| Level | Name | Capabilities | Intended Use |
+|-------|------|-------------|-------------|
+| 1 | Read-Only | Execution Graph View (read), Profile View, Payload Type Browser, Notification Flow View, Scoring Overlay | Dashboards, observability integrations, read-only monitoring tools |
+| 2 | Standard | All Level 1 + Flow Simulation, Shadow Mode Dashboard (view only), Policy Node Detail, Scoring Simulation | Platform engineer tooling, policy review workflows |
+| 3 | Full | All Level 2 + Policy Canvas (save as PR), Policy Authoring Interface, Test Case Management, Shadow Mode Promotion | Full policy lifecycle management, policy authoring tooling |
 
-**Level 2 — Standard:** All Level 1 plus Flow Simulation, Shadow Mode Dashboard (view only), Policy Node Detail. Required for platform engineer tooling.
+### 10.1 Conformance Implementation Checklist
 
-**Level 3 — Full:** All Level 2 plus Policy Canvas (save as PR), Policy Authoring Interface, Test Case Management, Shadow Mode Promotion. Required for full policy lifecycle management.
+**Level 1 — minimum required endpoints:**
+- `GET /flow/api/v1/graph`
+- `GET /flow/api/v1/graph/nodes/{policy_uuid}`
+- `GET /flow/api/v1/profile`
+- `GET /flow/api/v1/payload-types`
+- `GET /flow/api/v1/notifications/flow/{entity_uuid}`
+- `GET /flow/api/v1/graph/scoring-overlay`
+
+**Level 2 — adds:**
+- `POST /flow/api/v1/simulate`
+- `POST /flow/api/v1/simulate/score`
+- `GET /flow/api/v1/shadow`
+- `GET /flow/api/v1/shadow/{policy_uuid}`
+
+**Level 3 — adds:**
+- `GET /flow/api/v1/canvas/preview`
+- `POST /flow/api/v1/canvas/save`
+- `GET /flow/api/v1/policies/{policy_uuid}/canvas`
+- `POST /flow/api/v1/policies/generate`
+- `POST /flow/api/v1/policies/validate-rego`
+- `GET /flow/api/v1/policies/{policy_uuid}/tests`
+- `POST /flow/api/v1/policies/{policy_uuid}/tests/from-request`
+- `POST /flow/api/v1/policies/{policy_uuid}/tests:run`
+- `POST /flow/api/v1/shadow/{policy_uuid}:promote`
+- `PATCH /flow/api/v1/profile/scoring`
 
 ---
 
@@ -828,14 +927,12 @@ GET /flow/api/v1/graph/scoring-overlay
 Response 200:
 {
   "active_profile": "standard",
-  "thresholds": {
-    "auto_approve_below": 25,
-    "approval_routing": [
-      { "tier": "reviewed", "max_score": 59 },
-      { "tier": "verified", "max_score": 79 },
-      { "tier": "authorized", "max_score": 100 }
-    ]
-  },
+  "thresholds": [
+    { "tier": "auto",       "max_score": 24 },
+    { "tier": "reviewed",   "max_score": 59 },
+    { "tier": "verified",   "max_score": 79 },
+    { "tier": "authorized", "max_score": 100 }
+  ],
   "nodes": [
     {
       "node_id": "<policy_uuid>",

@@ -1,10 +1,5 @@
 # DCM Data Model — Deployment and Redundancy Model
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete  
 **Related Documents:** [Context and Purpose](00-context-and-purpose.md) | [Storage Providers](11-storage-providers.md) | [Universal Audit Model](16-universal-audit.md) | [Policy Organization](14-policy-profiles.md)

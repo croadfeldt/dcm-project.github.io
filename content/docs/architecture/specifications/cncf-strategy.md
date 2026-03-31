@@ -1,10 +1,5 @@
 # DCM — CNCF Strategy and Community Engagement Plan
 
-> **⚠️ Active Development Notice**
-> 
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
-> 
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 
 **Version:** 0.1.0-draft  

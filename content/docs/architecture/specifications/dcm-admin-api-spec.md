@@ -19,6 +19,13 @@ The Admin API is the platform administration interface for DCM. It is served thr
 
 ---
 
+
+> **AEP Alignment:** This specification follows [AEP](https://aep.dev) conventions.
+> Custom methods use colon syntax (`POST /admin/providers/{uuid}:approve`).
+> Async operations return an `Operation` resource (AEP-136 LRO).
+> List pagination uses `page_size` and `page_token` parameters.
+> See the normative OpenAPI specification: `schemas/openapi/dcm-admin-api.yaml`
+
 ## 1. Authentication and Authorization
 
 All Admin API endpoints require Bearer token authentication (same as Consumer API). Role requirements are declared per endpoint:
@@ -110,8 +117,8 @@ Response 201 Created:
 ### 2.3 Suspend / Reinstate Tenant
 
 ```
-POST /api/v1/admin/tenants/{tenant_uuid}/suspend
-POST /api/v1/admin/tenants/{tenant_uuid}/reinstate
+POST /api/v1/admin/tenants/{tenant_uuid}:suspend
+POST /api/v1/admin/tenants/{tenant_uuid}:reinstate
 Role: platform_admin
 
 {
@@ -177,8 +184,8 @@ New provider registrations in `proposed` status require platform admin review:
 GET /api/v1/admin/providers/pending
 Role: platform_admin
 
-POST /api/v1/admin/providers/{provider_uuid}/approve
-POST /api/v1/admin/providers/{provider_uuid}/reject
+POST /api/v1/admin/providers/{provider_uuid}:approve
+POST /api/v1/admin/providers/{provider_uuid}:reject
 {
   "reason": "<required for reject>"
 }
@@ -187,7 +194,7 @@ POST /api/v1/admin/providers/{provider_uuid}/reject
 ### 3.3 Suspend Provider
 
 ```
-POST /api/v1/admin/providers/{provider_uuid}/suspend
+POST /api/v1/admin/providers/{provider_uuid}:suspend
 Role: platform_admin
 
 {
@@ -228,7 +235,7 @@ Response 200:
 ### 4.2 Approve Accreditation
 
 ```
-POST /api/v1/admin/accreditations/{accreditation_uuid}/approve
+POST /api/v1/admin/accreditations/{accreditation_uuid}:approve
 Role: platform_admin
 Requires: step-up MFA
 
@@ -258,7 +265,7 @@ Requires: step-up MFA
 ### 5.1 Trigger Discovery
 
 ```
-POST /api/v1/admin/discovery/trigger
+POST /api/v1/admin/discovery:trigger
 Role: platform_admin | tenant_admin
 
 {
@@ -411,7 +418,7 @@ Role: platform_admin
 ## 9. Search Index Management
 
 ```
-POST /api/v1/admin/search-index/rebuild
+POST /api/v1/admin/search-index:rebuild
 Role: platform_admin
 
 {
@@ -445,7 +452,7 @@ Response 200:
 ### 10.1 Rotate Bootstrap Admin Credential
 
 ```
-POST /api/v1/admin/bootstrap/rotate-credential
+POST /api/v1/admin/bootstrap:rotate-credential
 Role: platform_admin
 Requires: step-up MFA (hardware_token_mfa for fsi/sovereign)
 
@@ -547,7 +554,7 @@ Platform admins can force-revoke sessions for any actor — used on actor compro
 
 ```http
 # Force-revoke all sessions for an actor
-POST /api/v1/admin/actors/{actor_uuid}/revoke-sessions
+POST /api/v1/admin/actors/{actor_uuid}:revoke-sessions
 Authorization: Bearer <admin-token>
 
 {
@@ -711,7 +718,7 @@ Response 200:
   "score_half_life_days": 7
 }
 
-POST /api/v1/admin/actors/{actor_uuid}/risk-history/reset
+POST /api/v1/admin/actors/{actor_uuid}/risk-history:reset
 {
   "reason": "Actor confirmed as trusted automation account",
   "audit_note": "Reviewed and approved by platform admin"
@@ -786,7 +793,7 @@ Response 200:
 ### Record an Approval Decision
 
 ```
-POST /api/v1/admin/approvals/{approval_uuid}/vote
+POST /api/v1/admin/approvals/{approval_uuid}:vote
 
 {
   "decision": "approve | reject",
@@ -914,7 +921,7 @@ Response 200:
 ### Accept a Security Degradation
 
 ```
-POST /api/v1/admin/tier-registry/changes/{change_uuid}/accept-degradation
+POST /api/v1/admin/tier-registry/changes/{change_uuid}:accept-degradation
 
 {
   "affected_item_uuid": "<uuid>",
@@ -938,7 +945,7 @@ Response 409: degradation already accepted
 ### Activate a Tier Registry Change
 
 ```
-POST /api/v1/admin/tier-registry/changes/{change_uuid}/activate
+POST /api/v1/admin/tier-registry/changes/{change_uuid}:activate
 
 Response 200:
 {
@@ -954,7 +961,7 @@ Response 409: change has unresolved blocking items (broken_references or unaccep
 ### List Historical Registry Changes
 
 ```
-GET /api/v1/admin/tier-registry/changes?status=activated&limit=20
+GET /api/v1/admin/tier-registry/changes?status=activated&page_size=20
 
 Response 200:
 {

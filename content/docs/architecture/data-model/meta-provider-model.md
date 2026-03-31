@@ -1,14 +1,5 @@
----
-title: "Meta Provider Composability Model"
-type: docs
-weight: 30
----
+# DCM Data Model — Meta Provider Composability Model
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. This document specifies the Meta Provider composability model — what a Meta Provider is, what it declares to DCM, and how standard DCM machinery handles the rest.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — Meta Provider Specification

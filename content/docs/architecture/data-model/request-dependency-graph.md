@@ -1,8 +1,4 @@
----
-title: "Consumer Request Dependency Graph"
-type: docs
-weight: 38
----
+# DCM Data Model — Consumer Request Dependency Graph
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — Cross-Request Ordering

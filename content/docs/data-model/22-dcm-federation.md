@@ -1,10 +1,5 @@
 # DCM Data Model — DCM Federation, Peering, and Cross-Instance Coordination
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications are work in progress and subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete  
 **Related Documents:** [Federated Contribution Model](28-federated-contribution-model.md) | [Universal Group Model](15-universal-groups.md) | [Storage Providers](11-storage-providers.md) | [Auth Providers](19-auth-providers.md) | [Information Providers Advanced](21-information-providers-advanced.md)

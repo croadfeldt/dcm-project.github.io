@@ -1,5 +1,8 @@
 # DCM Admin Web GUI Specification
 
+> **AEP Alignment:** Admin API endpoints referenced in this spec follow [AEP](https://aep.dev) conventions — custom methods use colon syntax (`POST /admin/providers/{uuid}:approve`). See `schemas/openapi/dcm-admin-api.yaml` for the normative specification.
+
+
 **Document Status:** 🔄 In Progress
 **Document Type:** Specification — Platform Administration Interface
 **Related Documents:** [Admin API Specification](dcm-admin-api-spec.md) | [Consumer GUI Specification](dcm-consumer-gui-spec.md) | [Provider GUI Specification](dcm-provider-gui-spec.md) | [Flow GUI Specification](dcm-flow-gui-spec.md)
@@ -84,7 +87,7 @@ Dashboard widgets (configurable per role):
 
 ## 3. Tenant Management
 
-**API:** `GET /api/v1/admin/tenants`, `POST /api/v1/admin/tenants`, `POST /api/v1/admin/tenants/{uuid}/suspend`, `POST /api/v1/admin/tenants/{uuid}/reinstate`, `DELETE /api/v1/admin/tenants/{uuid}`
+**API:** `GET /api/v1/admin/tenants`, `POST /api/v1/admin/tenants`, `POST /api/v1/admin/tenants/{uuid}:suspend`, `POST /api/v1/admin/tenants/{uuid}:reinstate`, `DELETE /api/v1/admin/tenants/{uuid}`
 
 - Tenant list with status, member count, resource count, quota utilization
 - Create tenant form: name, description, initial quota set, initial admin member
@@ -96,7 +99,7 @@ Dashboard widgets (configurable per role):
 
 ## 4. Provider Management
 
-**API:** `GET /api/v1/admin/providers`, `GET /api/v1/admin/providers/pending`, `POST /api/v1/admin/providers/{uuid}/approve`, `POST /api/v1/admin/providers/{uuid}/reject`, `POST /api/v1/admin/providers/{uuid}/suspend`
+**API:** `GET /api/v1/admin/providers`, `GET /api/v1/admin/providers/pending`, `POST /api/v1/admin/providers/{uuid}:approve`, `POST /api/v1/admin/providers/{uuid}:reject`, `POST /api/v1/admin/providers/{uuid}:suspend`
 
 > **Full provider management** (configuration, capacity, entity lists, type-specific management) is in the **[Provider GUI](dcm-provider-gui-spec.md)**. This section covers the admin-level registration approval workflow.
 
@@ -110,7 +113,7 @@ Dashboard widgets (configurable per role):
 
 ## 5. Accreditation Management
 
-**API:** `GET /api/v1/admin/accreditations`, `POST /api/v1/admin/accreditations/{uuid}/approve`, `DELETE /api/v1/admin/accreditations/{uuid}`
+**API:** `GET /api/v1/admin/accreditations`, `POST /api/v1/admin/accreditations/{uuid}:approve`, `DELETE /api/v1/admin/accreditations/{uuid}`
 
 - Pending accreditations queue with submission detail
 - Approve / revoke with required comment
@@ -121,7 +124,7 @@ Dashboard widgets (configurable per role):
 
 ## 6. Discovery and Orphan Management
 
-**API:** `POST /api/v1/admin/discovery/trigger`, `GET /api/v1/admin/discovery/jobs/{uuid}`, `GET /api/v1/admin/orphans`, `POST /api/v1/admin/orphans/{uuid}/resolve`
+**API:** `POST /api/v1/admin/discovery:trigger`, `GET /api/v1/admin/discovery/jobs/{uuid}`, `GET /api/v1/admin/orphans`, `POST /api/v1/admin/orphans/{uuid}/resolve`
 
 ### 6.1 Discovery Console
 
@@ -175,7 +178,7 @@ Dashboard widgets (configurable per role):
 
 ## 9. Approval Management
 
-**API:** `GET /api/v1/admin/approvals/pending`, `POST /api/v1/admin/approvals/{uuid}/vote`, `GET /api/v1/admin/approvals/{uuid}`
+**API:** `GET /api/v1/admin/approvals/pending`, `POST /api/v1/admin/approvals/{uuid}:vote`, `GET /api/v1/admin/approvals/{uuid}`
 
 - All pending approvals across all tenants (Platform Admin view) vs own queue (approver view)
 - Filter by tier (reviewed / verified / authorized), resource type, tenant, age
@@ -187,7 +190,7 @@ Dashboard widgets (configurable per role):
 
 ## 10. Authority Tier Registry
 
-**API:** `POST /api/v1/admin/tier-registry/changes`, `GET /api/v1/admin/tier-registry/changes/{uuid}/impact`, `POST /api/v1/admin/tier-registry/changes/{uuid}/accept-degradation`, `POST /api/v1/admin/tier-registry/changes/{uuid}/activate`
+**API:** `POST /api/v1/admin/tier-registry/changes`, `GET /api/v1/admin/tier-registry/changes/{uuid}/impact`, `POST /api/v1/admin/tier-registry/changes/{uuid}:accept-degradation`, `POST /api/v1/admin/tier-registry/changes/{uuid}:activate`
 
 - Current tier registry: ordered list display (auto → reviewed → verified → authorized → [custom tiers])
 - Propose change: drag-and-drop reordering with add/remove custom tier
@@ -212,7 +215,7 @@ Visible to `auditor` and `platform_admin` roles.
 
 ## 12. Session and Security Management
 
-**API:** `GET /api/v1/admin/actors/{uuid}/...`, `POST /api/v1/admin/actors/{uuid}/revoke-sessions`
+**API:** `GET /api/v1/admin/actors/{uuid}/...`, `POST /api/v1/admin/actors/{uuid}:revoke-sessions`
 
 Visible to `security` and `platform_admin` roles.
 
@@ -225,7 +228,7 @@ Visible to `security` and `platform_admin` roles.
 
 ## 13. Health and Operations
 
-**API:** `GET /api/v1/admin/health`, `GET /api/v1/admin/discovery/trigger`, `POST /api/v1/admin/search-index/rebuild`
+**API:** `GET /api/v1/admin/health`, `GET /api/v1/admin/discovery:trigger`, `POST /api/v1/admin/search-index:rebuild`
 
 Visible to `sre` and `platform_admin` roles.
 

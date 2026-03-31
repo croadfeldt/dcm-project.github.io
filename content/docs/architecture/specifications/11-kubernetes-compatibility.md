@@ -21,13 +21,18 @@
 
 
 
-**Document Status:** ✅ Complete  
+**Document Status:** ✅ Complete
 **Document Type:** Architecture Reference  
 **Related Documents:** [Foundational Abstractions](../data-model/00-foundations.md) | [Entity Relationships](../data-model/09-entity-relationships.md) | [Resource Type Hierarchy](../data-model/05-resource-type-hierarchy.md) | [Resource/Service Entities](../data-model/06-resource-service-entities.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md)
 
 ---
 
 ## 1. Purpose
+
+> **AEP Alignment:** API endpoint references in this document follow [AEP](https://aep.dev) conventions
+> (custom methods use colon syntax). See `schemas/openapi/dcm-consumer-api.yaml` for the
+> normative OpenAPI specification.
+
 
 DCM is designed as a **superset of Kubernetes** — extending Kubernetes' declarative, controller-based model upward to provide unified management across multiple clusters, infrastructure types, and organizational boundaries that Kubernetes alone cannot address.
 
@@ -40,6 +45,10 @@ This document serves three purposes:
 ---
 
 ## 2. The Superset Relationship
+
+DCM is a superset of Kubernetes in the sense that it provides all the capabilities Kubernetes provides — and more. An organization running Kubernetes exclusively is using a subset of what DCM can manage. DCM does not replace Kubernetes; it manages the lifecycle of Kubernetes clusters and the resources running on them.
+
+The superset relationship means DCM can manage Kubernetes-native resources (Deployments, Services, PersistentVolumes) through conformant operators, and it can manage the clusters themselves as catalog items. It also means DCM manages resources that have no Kubernetes equivalent — bare metal, VMs, VLANs, IP allocations, and organizational data entities.
 
 ### 2.1 What Kubernetes Provides
 
@@ -145,12 +154,10 @@ A Kubernetes cluster is a first-class catalog item in DCM. Any authorized Tenant
 **How it works:**
 
 ```yaml
-# Consumer requests a cluster via the catalog
 catalog_item: Platform.KubernetesCluster
 provider: CAPI-based Service Provider (or managed K8s Service Provider)
 tenant_uuid: <requesting-tenant-uuid>
 
-# The resulting entity:
 entity:
   resource_type: Platform.KubernetesCluster
   tenant_uuid: <requesting-tenant-uuid>   # Tenant owns the cluster
@@ -182,6 +189,20 @@ This is a Meta Provider — the cluster catalog item orchestrates all constituen
 
 
 ## 4. Where DCM Extends Beyond Kubernetes
+
+These are capabilities that exist in DCM but have no Kubernetes equivalent. None of these require Kubernetes to be present — they operate across all provider types. For organizations running pure Kubernetes estates, these are the capabilities DCM brings that Kubernetes tooling alone cannot provide.
+
+**Summary of extensions:**
+
+| DCM Capability | Kubernetes Gap |
+|---------------|---------------|
+| Intent State | No concept of original consumer intent separate from desired state |
+| Field-Level Provenance | No field lineage — a field is a field |
+| Data Layers and Assembly | No layering model — manifests are flat declarations |
+| Policy Engine | Admission webhooks are cluster-scoped, admission-time only |
+| Cost Analysis | No native cost attribution in the request lifecycle |
+| Information Providers | No structured external organizational data relationships |
+| Cross-Cluster Lifecycle | Single-cluster scope — multi-cluster requires external tooling |
 
 These are concepts that exist in DCM but have no Kubernetes equivalent. They are the capabilities DCM adds that justify the superset positioning.
 
@@ -361,9 +382,9 @@ This is particularly significant: DCM managing the lifecycle of Kubernetes clust
 
 ---
 
-## 8. Migration Path — Kubernetes-Native to DCM-Managed
+## 8. Incremental Adoption — Kubernetes-Native to DCM-Managed
 
-Organizations running Kubernetes today can adopt DCM incrementally:
+Organizations running Kubernetes can adopt DCM incrementally across these phases:
 
 ### Phase 1 — Observation (no operator changes)
 Deploy DCM with the Kubernetes Information Provider. DCM observes existing resources via the Kubernetes API and builds a Discovered State inventory. No changes to existing operators or workloads.

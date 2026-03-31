@@ -166,11 +166,11 @@ After Step 3 (dynamic policies evaluate):
 → Notification dispatched:
     audience: manager (from actor's group membership via relationship graph)
     event_type: request.requires_approval
-    action_url: /api/v1/requests/req-001/approve
+    action_url: /api/v1/requests/req-001:approve
     action_deadline: PT24H
 
 Manager approves:
-POST /api/v1/requests/req-001/approve
+POST /api/v1/requests/req-001:approve
 { "approval_type": "manager_approval", "approver_uuid": "mgr-001" }
 
 → payload.approvals["manager_approval"] = { approved: true, by: "mgr-001" }
@@ -432,10 +432,10 @@ Step 2: Event: ingestion.transitional_created
 Step 3: Event: ingestion.enriched
 → Notification to Platform Admin:
   "Brownfield entity discovered. Review and assign to Tenant."
-  action_url: /api/v1/admin/ingestion/ing-001/promote
+  action_url: /api/v1/admin/ingestion/ing-001:promote
 
 Step 4: Operator approves:
-POST /api/v1/admin/ingestion/ing-001/promote
+POST /api/v1/admin/ingestion/ing-001:promote
 { "target_tenant_uuid": "payments-tenant-uuid",
   "compliance_overlay": "pci-dss" }
 
@@ -446,6 +446,190 @@ POST /api/v1/admin/ingestion/ing-001/promote
 ```
 
 ---
+
+
+## 1.9 VM Lifecycle — Static Replace
+
+Re-provision a VM using its existing Requested State payload exactly as it was
+dispatched, without re-running layer enrichment or policy evaluation. The result
+is a functionally identical resource to the one being replaced.
+
+**When to use Static Replace vs Rehydration:**
+
+| | Static Replace | Rehydration |
+|-|---------------|-------------|
+| Uses | Original Requested State (the exact dispatch payload) | Original Intent State (what the consumer asked for) |
+| Policy re-evaluation | No — payload is used as-is | Yes — full layer enrichment + policy evaluation runs again |
+| Standards compliance | Reflects policies at time of original provisioning | Reflects current policies and current layers |
+| Use case | Known-good rebuild, emergency restore, hardware swap | Standards refresh, datacenter migration, DR in a new zone |
+| AEP endpoint | `POST /api/v1/resources/{entity_uuid}:rehydrate` with `mode: static` | `POST /api/v1/resources/{entity_uuid}:rehydrate` with `mode: intent` |
+
+**Preconditions:**
+- Entity exists in DCM with status `OPERATIONAL` or `SUSPENDED`
+- A Requested State record exists (all DCM-provisioned resources have one)
+- The Service Provider that originally provisioned the resource is still registered and healthy
+- The target resource type has not had a breaking schema change (VER-009)
+
+**Workflow:**
+
+```
+Consumer: POST /api/v1/resources/{entity_uuid}:rehydrate
+  {
+    "mode": "static",
+    "reason": "Hardware failure on host — replacing on equivalent host in same zone",
+    "target_zone": null,             // null = same zone as original
+    "retain_entity_uuid": true,      // DCM entity UUID is preserved
+    "pre_rehydration_backup": true   // optional: snapshot before proceeding
+  }
+
+Response 200 OK — returns Operation:
+  {
+    "name": "/api/v1/operations/{request_uuid}",
+    "done": false,
+    "metadata": {
+      "stage": "REHYDRATION_INITIATED",
+      "resource_uuid": "{entity_uuid}",
+      "rehydration_mode": "static",
+      "source_requested_state_uuid": "{original_requested_state_uuid}"
+    }
+  }
+```
+
+**What DCM does:**
+
+```
+1. Retrieve the most recent Requested State record for entity_uuid
+   (this is the exact payload that was dispatched at original provisioning time)
+
+2. Entity enters REHYDRATING lifecycle state
+   (incoming traffic should be shifted away at LTM/GTM level before initiating)
+
+3. Decommission the existing resource via the Service Provider
+   DELETE /{resource_id} → operator removes the resource
+   Decommission callback received → entity status: DECOMMISSIONED (transient)
+
+4. Re-dispatch the original Requested State payload to the Service Provider
+   POST / with the original CreateRequest body
+   No layer enrichment — payload is used verbatim
+   No policy re-evaluation — payload is used verbatim
+   NOTE: resource_type_uuid and resource_type_name are still validated
+         against the current Resource Type Registry (VER-009 compatibility check)
+
+5. Realization callback received → entity returns to OPERATIONAL
+   A new Realized State record is written (linked to the original Requested State)
+   The entity_uuid is preserved — external references remain valid
+
+6. Operation reaches done: true
+   operation.response contains the realized entity
+```
+
+**The key distinction from Rehydration (intent mode):**
+Static Replace bypasses the entire layer assembly and policy evaluation pipeline.
+It takes the already-assembled, already-approved Requested State and re-executes it.
+This makes it deterministic — the result is the same resource on equivalent hardware.
+If standards have changed since the original provisioning and you need the resource
+to comply with current standards, use `mode: intent` (Rehydration) instead.
+
+**Precaution — IaC parity:**
+For Static Replace to be reliable, the application and its data must be on a separate
+partition or external storage. The VM's OS and configuration layers are what Static
+Replace rebuilds. Application data on the OS volume will be lost. This mirrors the
+assumption stated in the PDF architecture: *"Application install and data exist on
+separate partition."*
+
+**Orchestration Flow Policy (Static Replace):**
+
+```rego
+package dcm.orchestration.static_replace
+
+# Fired when consumer requests static rehydration
+steps := [
+    {"step": 1, "payload_type": "lifecycle.rehydration_requested",
+     "condition": "payload.mode == 'static'",
+     "policy_handle": "system/lifecycle/validate-static-replace-preconditions"},
+    {"step": 2, "payload_type": "lifecycle.static_replace_validated",
+     "policy_handle": "system/provider/decommission-for-replace"},
+    {"step": 3, "payload_type": "lifecycle.decommission_confirmed",
+     "policy_handle": "system/provider/dispatch-original-requested-state"},
+    {"step": 4, "payload_type": "realization.completed",
+     "policy_handle": "system/lifecycle/restore-operational-state"},
+]
+```
+
+**Related use cases:** See Section 1.8 (Brownfield Ingestion) for bringing existing
+resources under DCM management. See Section 1.5 (Drift Detection) for reconciling
+drift rather than replacing. See the Ingestion Model (doc 13) for the `mode: intent`
+Rehydration flow (replaying intent through current policies).
+
+---
+
+## 1.10 VM Lifecycle — In-Place Upgrade (Leapp / IPU Pattern)
+
+Upgrade the OS of a running VM in-place, managed as a DCM lifecycle event.
+This preserves the VM entity UUID, Requested State, and Realized State chain —
+the VM is the same DCM entity before and after the upgrade.
+
+**Preconditions:**
+- Entity is `OPERATIONAL`
+- The upgrade automation exists as a registered Process Resource Type
+  (e.g., `Process.LeappUpgrade`, `Process.OSUpgrade`)
+- A backup or snapshot policy is active for this entity
+
+**Workflow:**
+
+```
+Consumer: POST /api/v1/requests
+  {
+    "catalog_item_uuid": "{leapp-upgrade-catalog-item-uuid}",
+    "fields": {
+      "target_entity_uuid": "{vm-entity-uuid}",
+      "target_os_version": "RHEL 9.4",
+      "pre_upgrade_snapshot": true,
+      "maintenance_window_uuid": "{mw-uuid}"   // optional
+    }
+  }
+```
+
+**What DCM does:**
+
+```
+1. Policy Engine validates:
+   - Target entity is OPERATIONAL
+   - Target OS version is in the approved versions list (Core Policy)
+   - Maintenance window is active (if required by policy)
+   - Pre-upgrade snapshot capability exists on the provider
+
+2. Entity enters UPDATING lifecycle state
+   (DCM marks entity in maintenance — routing at LTM layer should drain)
+
+3. Process Resource entity created (Process.LeappUpgrade)
+   UUID assigned; linked to the VM entity via 'operational' relationship
+   Dispatched to the Service Provider as a process execution request
+
+4. Service Provider executes upgrade automation
+   Interim status callbacks update the Process Resource entity status
+   VM entity remains UPDATING throughout
+
+5. Post-upgrade validation runs:
+   - Health checks pass
+   - OS version matches target_os_version in the Realized State
+
+6. New Realized State record written for the VM entity
+   delta_fields: {os_version: "RHEL 9.4", last_upgraded_at: <timestamp>}
+   The Process Resource entity moves to DECOMMISSIONED (process complete)
+
+7. Entity returns to OPERATIONAL
+   Maintenance mode released — routing restored
+```
+
+**Key DCM properties preserved:**
+The VM entity UUID does not change. The Requested State (original intent) does not
+change. The upgrade is recorded as a new Realized State record with `delta_fields`
+carrying the changed values, linked to the prior Realized State. The full provenance
+chain is intact for audit.
+
+---
+
 
 # Section 2 — Provider Interaction Examples
 
@@ -714,7 +898,7 @@ Response: { "notifications": [{
 }] }
 
 # Consumer approves
-POST /api/v1/resources/ent-001/provider-notifications/notif-001/approve
+POST /api/v1/resources/ent-001/provider-notifications/notif-001:approve
 { "decision": "approve", "reason": "Legitimate auto-scale event" }
 
 Response 202: { "decision": "approve", "realized_state_uuid": "real-002" }
@@ -752,7 +936,7 @@ Response: { "registrations": [{
 }] }
 
 # Admin reviews and approves
-POST /api/v1/admin/registrations/reg-001/approve
+POST /api/v1/admin/registrations/reg-001:approve
 { "review_notes": "Certificate verified against corp CA. BAA reviewed and valid." }
 
 Response: { "registration_uuid": "reg-001", "status": "ACTIVE" }

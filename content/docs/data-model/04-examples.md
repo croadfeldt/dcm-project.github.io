@@ -1,10 +1,5 @@
 # DCM Data Model — Worked Examples
 
-> **⚠️ Active Development Notice**
->
-> Examples in this document are illustrative of the intended architecture. YAML structures, field names, and sequences represent the design intent and will be refined as implementation proceeds.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Document Type:** Reference Examples

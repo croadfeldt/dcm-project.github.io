@@ -1,8 +1,4 @@
----
-title: "DCM Event Catalog"
-type: docs
-weight: 33
----
+# DCM Data Model — Event Catalog
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — Authoritative Event Catalog
@@ -724,6 +720,67 @@ payload:
 
 ---
 
+## 20. Accreditation Events (`accreditation.*`)
+
+Fired by the Accreditation Monitor (doc 47) when external verification
+of a registered accreditation produces a result or requires attention.
+
+| Event Type | Urgency | Description |
+|-----------|---------|-------------|
+| `accreditation.verified` | low | Periodic external confirmation — accreditation still active in external registry |
+| `accreditation.status_changed` | high or critical | External registry reports a different status than DCM records — requires platform admin review |
+| `accreditation.registry_mismatch` | high | External registry cannot find the accreditation by its `external_registry_id` — ID may need correction |
+| `accreditation.verification_stale` | varies | `last_checked_at` exceeds `stale_after` threshold — stale_action applied per configuration |
+| `accreditation.document_expired` | high | Evidence document (SOC 2 report, AoC) is older than `max_age` threshold — new document required |
+| `accreditation.contract_event` | varies | Contract management webhook received (BAA signed, amended, or terminated) |
+| `accreditation.expiry_approaching` | medium | Approaching `valid_until` within `renewal_warning_before` window (automated complement to TTL-based check) |
+
+### 20.1 Payload Schemas
+
+```yaml
+# accreditation.status_changed — the most critical event
+accreditation.status_changed:
+  accreditation_uuid: <uuid>
+  subject_uuid: <provider-or-deployment-uuid>
+  framework: fedramp_high | iso_27001 | cmmc_2 | ...
+  from_status: authorized | active | certified
+  to_status: in_process | revoked | suspended | withdrawn
+  external_source: fedramp_marketplace | cmmc_ab | iaf_certsearch | contract_webhook
+  detected_at: <ISO 8601>
+  action_taken: pending_review | immediate_revocation
+  # immediate_revocation when to_status is 'revoked' or 'terminated'
+
+# accreditation.verification_stale
+accreditation.verification_stale:
+  accreditation_uuid: <uuid>
+  subject_uuid: <uuid>
+  framework: <string>
+  last_checked_at: <ISO 8601>
+  stale_after: P7D
+  stale_action_taken: warn | suspended | escalated
+  consecutive_failures: <integer>
+
+# accreditation.contract_event
+accreditation.contract_event:
+  accreditation_uuid: <uuid>
+  subject_uuid: <uuid>
+  framework: hipaa | dod_il4 | <custom>
+  contract_event_type: signed | amended | terminated | renewal_due | renewed
+  contract_id: <string>
+  effective_date: <ISO 8601>
+  dcm_action_taken: activated | pending_review | revoked | none
+```
+
+### 20.2 System Policy
+
+| Policy | Rule |
+|--------|------|
+| `EVT-ACM-001` | `accreditation.status_changed` events with `action_taken: immediate_revocation` are non-suppressable — they are delivered to Compliance Team and Platform Admin regardless of notification preferences. |
+| `EVT-ACM-002` | `accreditation.verification_stale` urgency is profile-governed: `low` for dev/standard; `medium` for prod; `high` for fsi/sovereign. |
+
+---
+
+
 ## 19. Event Type Quick Reference
 
 ```
@@ -784,3 +841,14 @@ auth.provider_failover
 ---
 
 *Document maintained by the DCM Project. For questions or contributions see [GitHub](https://github.com/dcm-project).*
+
+### Additional Event Types
+
+| Event Type | Description | Key Fields | Consumers |
+|------------|-------------|-----------|----------|
+| `entity.deleted` | An entity has been fully decommissioned and removed from inventory | entity_uuid, from_state, to_state (where applicable) | LCM, AUD, OBS |
+| `entity.state_transition` | An entity lifecycle state has changed (e.g., OPERATIONAL → SUSPENDED) | entity_uuid, from_state, to_state (where applicable) | LCM, AUD, OBS |
+| `group.deleted` | A DCMGroup has been deleted | entity_uuid, from_state, to_state (where applicable) | LCM, AUD, OBS |
+| `group.member_added` | A member (actor or entity) has been added to a DCMGroup | entity_uuid, from_state, to_state (where applicable) | LCM, AUD, OBS |
+| `group.member_removed` | A member (actor or entity) has been removed from a DCMGroup | entity_uuid, from_state, to_state (where applicable) | LCM, AUD, OBS |
+| `authorization.granted` | A cross-tenant authorization has been granted | entity_uuid, from_state, to_state (where applicable) | LCM, AUD, OBS |

@@ -1,14 +1,5 @@
----
-title: "DCM Data Model — Universal Audit Model"
-type: docs
-weight: 16
----
+# DCM Data Model — Universal Audit Model
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete  
 **Related Documents:** [Context and Purpose](00-context-and-purpose.md) | [Audit, Provenance, and Observability](12-audit-provenance-observability.md) | [Storage Providers](11-storage-providers.md) | [Universal Groups](15-universal-groups.md)
@@ -225,7 +216,7 @@ The `action` field uses a closed vocabulary. Free-text actions are invalid and r
 | `HOLD_RELEASE` | Resources | Resource hold released |
 | `DRIFT_DETECT` | Entities | Drift detected between Realized and Discovered |
 | `DRIFT_RESOLVE` | Entities | Drift resolved |
-| `INGEST` | Entities | Entity ingested (brownfield or V1 migration) |
+| `INGEST` | Entities | Entity ingested (brownfield or import) |
 | `PROMOTE` | Entities | Ingested entity promoted to full lifecycle |
 | `EXPIRE` | Entities | Lifecycle time constraint expiry action fired |
 | `REHYDRATE` | Entities | Rehydration requested |

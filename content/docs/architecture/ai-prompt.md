@@ -4924,7 +4924,129 @@ Full consistency review completed 2026-03. Key findings and fixes:
 **Three implementation decisions still needed:** (1) resource_type field: accept FQN string or require UUID at dispatch? (2) Operation polling: same endpoint as request status or separate? (3) API Gateway must map resource_id → entity_uuid at callback boundary.
 
 
-## SECTION 80 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 80 — IMPLEMENTATION DECISIONS RESOLVED (doc updates 2026-03)
+
+Three open implementation decisions have been resolved:
+
+**DECISION 1 — resource_type field: accept both FQN and UUID**
+- Consumers may supply resource_type as either FQN string (`Compute.VirtualMachine`) or Registry UUID
+- DCM resolves either form to the canonical (resource_type_uuid, resource_type_name) pair at request assembly time in the Request Payload Processor
+- FQN recommended for consumer use (stable across deployments; returned by service catalog)
+- UUID accepted for programmatic use where UUID was obtained from catalog API
+- Unresolvable references rejected at validation time: 422 + code RESOURCE_TYPE_NOT_FOUND
+- Dispatch payloads (CreateRequest/UpdateRequest) to operators ALWAYS carry both: resource_type_uuid + resource_type_name
+- Added to: dcm-common.json (resource_type_ref oneOf type), CatalogItem schema (oneOf in consumer YAML), doc 05, consumer spec, operator spec
+
+**DECISION 2 — operation.name → /api/v1/operations/{uuid} (separate AEP endpoint)**
+- operation_uuid == request_uuid — the same UUID serves both endpoints
+- GET /api/v1/operations/{uuid} → Operation schema (AEP-standard: done, metadata, response/error)
+- GET /api/v1/requests/{uuid}/status → RequestStatus schema (DCM-native: pipeline_stage, full history)
+- Both endpoints reflect the same underlying operation state
+- Operation.metadata includes request_uuid field so AEP clients can navigate to the rich view if needed
+- POST /api/v1/requests returns Operation with name = /api/v1/operations/{request_uuid}
+- Added to: consumer YAML (new GET /api/v1/operations/{operation_uuid} path, 61 paths total), Operation schema (request_uuid in metadata, dual-endpoint description), consumer spec (Operations polling section with dual-endpoint table)
+
+**DECISION 3 — resource_id → entity_uuid mapping (RESOLVED by existing data model)**
+- Not an open decision — already solved by the schema
+- DCM sends dcm_entity_uuid in every CreateRequest dispatch; operator echoes it in every response and callback
+- DCM uses entity_uuid for all routing; resource_id is operator's own correlation handle stored opaquely
+- API Gateway validates dcm_entity_uuid in each callback matches the entity under the calling provider's credential
+- Documented explicitly in operator interface spec
+
+
+## SECTION 81 — SPEC COMPLETION: K8S + OPERATOR SDK (2026-03)
+
+**11-kubernetes-compatibility.md** — Completed:
+- Document status header and related docs cross-references added
+- Section 2 intro: explains the superset relationship explicitly
+- Section 4 summary table: 7 DCM capabilities vs Kubernetes gaps, side-by-side
+- Comment lines cleaned from section 3a (code comment artifacts removed)
+- AEP alignment note added
+- All 5 open questions were already resolved; Resolution Notes complete
+- Status: ✅ Complete
+
+**dcm-operator-sdk-api.md** — Completed:
+- Document status header, related docs, AEP alignment note added
+- New Section 11: Callback Credential Management — automatic rotation, entity_uuid vs resource_id contract, DCM validation rule
+- resource_type_name field annotated: "FQN — always present alongside resource_type_uuid"
+- All 5 open questions were already resolved; Q10 header annotated
+- Status: ✅ Complete
+
+**All 14 specifications now have:** AEP alignment notes, document status headers, no stale slash-verb paths, consistent field naming.
+
+
+## SECTION 82 — PDF VALIDATION + THREE NEW ADDITIONS (2026-03)
+
+**PDF (Miro board) was validated against current architecture.** Core finding: PDF = original design intent; current docs = evolved, more detailed implementation. Structurally aligned. Three gaps identified and filled:
+
+**GAP 1 — Static Replace use case (dcm-examples.md sections 1.9 + 1.10):**
+- Static Replace = re-provision using existing Requested State verbatim, no layer enrichment, no policy re-evaluation. Deterministic rebuild.
+- Distinct from Rehydration (mode: intent) which replays original Intent State through current policies and layers.
+- `POST /api/v1/resources/{uuid}:rehydrate` with `mode: static` (same endpoint, different mode).
+- Precondition: application data on separate partition (VM OS/config is what gets rebuilt).
+- Orchestration Flow Policy specified (4-step: validate → decommission → dispatch original requested state → restore operational).
+- In-Place Upgrade (Leapp/IPU) also documented as Section 1.10 — upgrades OS in-place, preserves entity UUID, creates new Realized State delta record.
+
+**GAP 2 — Workload Analysis (new doc 46-workload-analysis.md):**
+- New capability: actively classifies discovered resources by operational characteristics.
+- Answers: "what is this resource?", "is it migratable?", "what lifecycle model applies?"
+- WorkloadProfile = process_resource_entity of type Analysis.WorkloadProfile.
+- Fires automatically as part of brownfield ingestion pipeline (DRC → WLA → Ingestion).
+- MTA (Migration Toolkit for Applications) is the reference Information Provider implementation.
+- 6 system policies WLA-001 through WLA-006.
+- API: GET /api/v1/resources/{uuid}/workload-profile, POST /api/v1/resources/{uuid}/workload-profile:analyze
+- Added to Capabilities Matrix as Domain 36 (6 capabilities: WLA-001 to WLA-006).
+
+**GAP 3 — Per-provider monitoring contract (registration spec + self-health doc):**
+- 7 Provider Readiness Gates (GATE-SP-01 through GATE-SP-07) added to registration spec Section 7.2.
+- Gates 1-3 required for all profiles; Gates 4-7 required for standard+.
+- GATE-SP-01: OpenAPI spec declared and reachable.
+- GATE-SP-02: Healthy API at activation.
+- GATE-SP-03: State Management callback implemented.
+- GATE-SP-04: Tenant Metadata endpoint (usage by tenant, quota consumed).
+- GATE-SP-05: Prometheus metrics (4 required families: dispatches_total, dispatch_duration_seconds, realizations_total, health_status).
+- GATE-SP-06: AEP.DEV linting passes (no errors in provider OpenAPI spec).
+- GATE-SP-07: Multi-tenant dispatch (accepts tenant_uuid).
+- Self-health doc (39-dcm-self-health.md) Section 7: Per-Provider Metrics Contract added.
+- Added to Capabilities Matrix as PRR-001 through PRR-007 in Provider Contract domain.
+- Matrix now: 37 domains / 287 capabilities.
+
+**PDF naming differences documented (not errors — terminology evolution):**
+Widget → Resource/Entity; Requested/Realized/Discovered Widget Store → State Stores;
+Widget Discovery → Discovery Scheduler; Interoperability API → Operator Interface;
+Provisioned Store → Realized State Store; Job Queue → Message Bus; Rules Engine → Policy Engine.
+
+
+## SECTION 83 — ACCREDITATION MONITOR (doc 47 — 47-accreditation-monitor.md)
+
+**Purpose:** Continuously verifies registered accreditations against authoritative external sources. Answers: "Is this accreditation still valid according to the issuing authority — not just the expiry date we were told?"
+
+**Four verification tiers (by automation depth):**
+- **Tier 1 — External Registry API (full automation):** FedRAMP (marketplace.fedramp.gov/api), CMMC 2.0 (cyberab.org/catalog), StateRAMP, ISO 27001 (iaf.nu CertSearch). Queries by external_registry_id; detects status changes including mid-cycle revocations.
+- **Tier 2 — Document Currency (partial automation):** SOC 2, PCI DSS AoC. Fetches document from certificate_ref/audit_report_ref, extracts date via PDF metadata or header parsing, validates against max_age threshold (default P365D).
+- **Tier 3 — Contract Webhook (event-driven):** HIPAA BAA, DoD IL. Inbound webhook from DocuSign/Ironclad/etc fires when BAA is signed, amended, or terminated. DCM processes: signed→active, amended→pending_review, terminated→revoked.
+- **Tier 4 — Expiry-Only (no external check):** Self-declared, internal, HIPAA BAA without contract system. Monitors declared valid_until only.
+
+**Key flows:**
+- Tier 1 poll detects Revoked status → immediate accreditation revocation → Accreditation Gap triggered (no admin confirmation required for revocations)
+- Tier 1 poll detects status change to non-revoked (e.g., Authorized → In Process) → status: pending_review → admin confirms
+- Registry unreachable → increment failure_count; no status change; fires verification_stale at threshold
+- stale_after exceeded → stale_action: warn/suspend/escalate (profile-governed: warn for dev/standard, suspend for prod, escalate for fsi/sovereign)
+
+**Accreditation record additions (doc 26 Section 3.3):** `verification` block with tier, registry_api/document_check/contract_webhook sub-blocks, stale_after, stale_action, verification_failure_count. `status` gains `pending_review` state. `gap_type` gains `verification_stale`.
+
+**Scoring Model addition (doc 29 Signal 5):** `verification_multipliers` — accreditation weight discounted based on verification currency: external_registry verified today = 1.0, expiry_only = 0.7, stale = 0.4, failed threshold = 0.1.
+
+**New events (doc 33 Section 20):** accreditation.verified, accreditation.status_changed, accreditation.registry_mismatch, accreditation.verification_stale, accreditation.document_expired, accreditation.contract_event, accreditation.expiry_approaching.
+
+**8 system policies: ACM-001 through ACM-008.** Key: ACM-002 (status change → pending_review except Revoked which is immediate), ACM-003 (registry unreachable does NOT revoke), ACM-004 (fsi/sovereign must use tier ≥ document_currency), ACM-007 (all verifications produce audit records — no silent checks).
+
+**Air-gapped mode:** Tiers fall back to expiry_only for unreachable registries. Retries after air_gapped_retry_interval (default P30D). Manual update of last_verified_at permitted with required justification.
+
+**Matrix:** Domain 37, ACM-001 through ACM-007. Total: 37 domains / 287 capabilities.
+
+
+## SECTION 84 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, apply these instructions in addition to the numbered guidance in SECTION 60 (Documentation Structure):
 

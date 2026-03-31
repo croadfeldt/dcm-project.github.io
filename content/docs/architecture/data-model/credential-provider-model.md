@@ -1,14 +1,5 @@
----
-title: "Credential Provider Model"
-type: docs
-weight: 31
----
+# DCM Data Model — Credential Provider Model
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. This document specifies the Credential Provider model — the issuance contract, credential lifecycle, rotation model, revocation propagation, and how credentials flow through the DCM pipeline.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — Credential Provider Specification
@@ -20,6 +11,8 @@ weight: 31
 > See also: [Provider Contract](A-provider-contract.md) | [Policy Contract](B-policy-contract.md)
 
 ---
+
+> **Cryptographic Standards:** See [Standards and Compliance Catalog](40-standards-catalog.md) for the complete list of permitted/forbidden algorithms, FIPS requirements per profile, and certificate protocol RFCs (RFC 7030, RFC 8555, RFC 8894, RFC 4210).
 
 ## 1. Purpose and Scope
 

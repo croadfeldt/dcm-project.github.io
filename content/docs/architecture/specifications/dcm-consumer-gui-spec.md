@@ -1,5 +1,8 @@
 # DCM Consumer Web GUI Specification
 
+> **AEP Alignment:** Consumer API endpoints referenced in this spec follow [AEP](https://aep.dev) conventions — custom methods use colon syntax, async operations return `Operation` resources, and `operation_uuid == request_uuid`. See `schemas/openapi/dcm-consumer-api.yaml` for the normative specification.
+
+
 **Document Status:** 🔄 In Progress
 **Document Type:** Specification — Consumer Web Interface
 **Related Documents:** [RHDH Integration Specification](dcm-rhdh-integration-spec.md) | [Consumer API Specification](consumer-api-spec.md) | [Admin GUI Specification](dcm-admin-gui-spec.md) | [Provider GUI Specification](dcm-provider-gui-spec.md) | [Flow GUI Specification](dcm-flow-gui-spec.md) | [Auth Providers](../data-model/19-auth-providers.md) | [Session Revocation](../data-model/35-session-revocation.md)
@@ -548,7 +551,7 @@ For organizations that require ITSM change board approval, DCM's `authorized` ti
   │
   ▼ Change Board reviews in ServiceNow (existing process unchanged)
   │   Approval decision → ServiceNow calls DCM Admin API:
-  │   POST /api/v1/admin/approvals/{uuid}/vote
+  │   POST /api/v1/admin/approvals/{uuid}:vote
   │   { "decision": "approve", "recorded_via": "servicenow", "voter_uuid": "..." }
   │
   ▼ DCM records vote; quorum tracked by DCM

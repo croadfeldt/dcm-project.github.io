@@ -1,14 +1,5 @@
----
-title: "DCM Foundational Abstractions"
-type: docs
-weight: 0
----
+# DCM — Foundational Abstractions
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Foundation — Read This First

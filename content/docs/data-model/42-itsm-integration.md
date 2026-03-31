@@ -51,7 +51,7 @@ DCM lifecycle event fires (e.g. request.dispatched)
 ITSM system approves a change record
   │
   ▼ ITSM system calls DCM API (via webhook or polling)
-  │   POST /api/v1/admin/approvals/{uuid}/vote
+  │   POST /api/v1/admin/approvals/{uuid}:vote
   │   { decision: "approve", recorded_via: "servicenow",
   │     external_reference: "CHG0012345" }
   │
@@ -182,7 +182,7 @@ itsm_provider_registration:
     
   # CAB approval → DCM vote mapping
   inbound_approval:
-    webhook_url: "https://dcm.corp/api/v1/admin/approvals/{approval_uuid}/vote"
+    webhook_url: "https://dcm.corp/api/v1/admin/approvals/{approval_uuid}:vote"
     trigger_on: "change_request.state → 'Approved'"
     decision_field: "state"
     decision_map:
@@ -208,7 +208,7 @@ itsm_provider_registration:
 ServiceNow Change Advisory Board approves CHG0012345
   │
   ▼ ServiceNow Business Rule fires on state change → "Approved"
-  │   Calls DCM webhook: POST /api/v1/admin/approvals/{uuid}/vote
+  │   Calls DCM webhook: POST /api/v1/admin/approvals/{uuid}:vote
   │   Headers: X-ServiceNow-Signature: <hmac>
   │   Body: { decision: "approve", recorded_via: "servicenow",
   │           external_reference: "CHG0012345" }
@@ -251,7 +251,7 @@ itsm_provider_registration:
     labels: ["dcm-automated", "{tenant_handle}"]
     
   inbound_approval:
-    webhook_url: "https://dcm.corp/api/v1/admin/approvals/{approval_uuid}/vote"
+    webhook_url: "https://dcm.corp/api/v1/admin/approvals/{approval_uuid}:vote"
     trigger_on: "issue.status → 'Approved'"
     decision_map:
       "Approved": "approve"

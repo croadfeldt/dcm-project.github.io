@@ -1,10 +1,5 @@
 # DCM Data Model — Information Providers: Confidence Scoring, Authority, and Conflict Resolution
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications are work in progress and subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete  
 **Related Documents:** [Information Providers](10-information-providers.md) | [Policy Organization](14-policy-profiles.md) | [Universal Audit Model](16-universal-audit.md) | [DCM Federation](22-dcm-federation.md)

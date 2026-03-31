@@ -1,8 +1,4 @@
----
-title: "DCM Self-Health Endpoints"
-type: docs
-weight: 39
----
+# DCM Data Model — DCM Self-Health Endpoints
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — Operational Health
@@ -338,6 +334,85 @@ dcm_provider_dispatch_duration_seconds{provider_type, quantile}
 dcm_internal_ca_certificates_active
 dcm_internal_ca_days_until_next_expiry
 ```
+
+---
+
+## 7. Per-Provider Metrics Contract
+
+In addition to DCM control plane metrics, each registered Service Provider must
+expose a Prometheus-compatible `/metrics` endpoint meeting the contract defined in
+the Registration Specification (GATE-SP-05).
+
+### 7.1 Required Provider Metric Families
+
+```
+# Dispatch metrics — how many requests DCM sent to this provider
+dcm_provider_dispatches_total{resource_type="Compute.VirtualMachine", outcome="success|failed|timeout"}
+dcm_provider_dispatch_duration_seconds{resource_type="Compute.VirtualMachine", quantile="0.5|0.95|0.99"}
+
+# Realization metrics — outcomes of provisioning
+dcm_provider_realizations_total{resource_type="Compute.VirtualMachine", status="OPERATIONAL|FAILED"}
+
+# Health signal
+dcm_provider_health_status  # gauge: 1=healthy, 0.5=degraded, 0=unhealthy
+```
+
+### 7.2 Recommended Provider Metric Families
+
+```
+# Capacity
+dcm_provider_capacity_remaining{resource_type="Compute.VirtualMachine"}  # gauge
+dcm_provider_capacity_total{resource_type="Compute.VirtualMachine"}      # gauge
+
+# Queue depth (for async-only providers)
+dcm_provider_queue_depth{resource_type="Compute.VirtualMachine"}  # gauge
+
+# Tenant usage
+dcm_provider_active_resources_total{tenant_uuid="...", resource_type="..."}
+```
+
+### 7.3 DCM Control Plane Aggregated Provider Metrics
+
+The DCM control plane exposes aggregated provider metrics at its own `/metrics`
+endpoint alongside the control plane metrics from Section 6:
+
+```
+# Already in Section 6 — shown here for cross-reference
+dcm_providers_registered_total               # count of registered providers
+dcm_providers_healthy_total                  # count currently healthy
+dcm_provider_dispatch_duration_seconds{...}  # aggregated across all providers
+```
+
+### 7.4 Tenant Metadata Endpoint
+
+Service Providers in `standard` and above profiles (GATE-SP-04) must implement
+a tenant metadata endpoint that DCM calls to retrieve per-tenant usage summaries:
+
+```
+GET /api/v1/tenants/{tenant_uuid}/metadata
+Authorization: Bearer <provider_callback_credential>
+
+Response 200:
+{
+  "tenant_uuid": "<uuid>",
+  "active_resources": {
+    "Compute.VirtualMachine": 12,
+    "Storage.Block": 8
+  },
+  "capacity_consumed": {
+    "Compute.VirtualMachine": {
+      "cpu_cores": 96,
+      "ram_gb": 384
+    }
+  },
+  "quota_consumed_pct": {
+    "Compute.VirtualMachine": 48.0
+  }
+}
+```
+
+This data is used by DCM's Cost Analysis component and multi-tenant quota
+enforcement. It is also exposed to tenant administrators via the consumer API.
 
 ---
 

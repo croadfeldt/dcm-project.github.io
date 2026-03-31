@@ -1,10 +1,5 @@
 # DCM Data Model — Webhooks, Messaging, and External Integration
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Related Documents (updated):** [Notification Model](23-notification-model.md) | [Entity Relationships](09-entity-relationships.md)  
@@ -257,7 +252,7 @@ quota_policy:
 
 > **⚠️ Architecture Update — Notification Model Supersedes Outbound Webhooks**
 >
-> The outbound webhook model described in Section 3 has been superseded by the **Unified Notification Model** (see [doc 23: Notification Model](23-notification-model.md)). Outbound webhooks are now one delivery channel type within the Notification Provider model rather than a parallel mechanism.
+> The outbound webhook model described in Section 3 has been one delivery channel within the Notification Model. Outbound webhooks are now one delivery channel type within the Notification Provider model rather than a parallel mechanism.
 >
 > **For new implementations:** Use the Notification Provider subscription model (doc 23, Section 6) with a webhook-type Notification Provider.
 >
@@ -349,7 +344,7 @@ webhook_registration:
 
 ### 3.3 Event Taxonomy
 
-> **See [doc 23: Notification Model](23-notification-model.md) Section 4 for the authoritative event taxonomy.** The table below is the legacy taxonomy for existing webhook registrations.
+> The table below is the event taxonomy for webhook subscriptions.
 
 The event taxonomy maps onto the Universal Audit action vocabulary. All are versioned registry entries:
 
@@ -381,7 +376,7 @@ webhook_payload:
   # Subject
   subject:
     entity_uuid: <uuid>
-    entity_type: resource_entity
+    entity_type: infrastructure_resource
     entity_handle: <handle>
     tenant_uuid: <uuid>
 

@@ -1,10 +1,5 @@
 # DCM Data Model — Accreditation, Data Authorization Matrix, and Zero Trust
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference
@@ -165,10 +160,24 @@ accreditation:
   external_registry_id: "FR2024-0042"    # e.g., FedRAMP Marketplace ID
 
   # Status
-  status: active | suspended | revoked | expired | pending_renewal
+  status: active | suspended | revoked | expired | pending_renewal | pending_review
   revocation_reason: <string|null>
   revoked_at: <ISO 8601|null>
+
+  # Automated verification (see doc 47 — Accreditation Monitor)
+  verification:
+    tier: external_registry | document_currency | contract_webhook | expiry_only
+    stale_after: P7D                # max gap between verifications before stale_action fires
+    stale_action: warn | suspend | escalate   # profile-governed default: warn/suspend/escalate
+    verification_failure_count: 0
+    # tier-specific fields: see doc 47 Section 3 for full schema
 ```
+
+> **Accreditation Monitor:** The `last_verified_at` field is maintained by the
+> Accreditation Monitor (doc 47), which continuously verifies accreditation status
+> against external registries, document currency checks, or contract system webhooks
+> depending on the `verification.tier`. See doc 47 for the complete monitoring
+> specification and framework-by-framework automation coverage.
 
 ### 3.4 Accreditation Lifecycle
 
@@ -192,6 +201,11 @@ Accreditation submitted (via API or GitOps PR)
   │     status → expired
   │     Providers relying on this accreditation flagged: ACCREDITATION_GAP
   │
+  ▼ External status change detected by Accreditation Monitor:
+  │   status → pending_review
+  │   Platform Admin notified (urgency: high)
+  │   Exception: external status = Revoked → immediate revocation (no review)
+  │
   ▼ Revocation:
       Accreditor or Platform Admin revokes
       status → revoked
@@ -209,7 +223,7 @@ accreditation_gap_record:
   provider_uuid: <uuid>
   required_framework: hipaa
   required_for: [phi data fields in active requests]
-  gap_type: missing | expired | revoked | suspended
+  gap_type: missing | expired | revoked | suspended | verification_stale
   detected_at: <ISO 8601>
   severity: critical                    # accreditation gaps are always high or critical
   affected_entity_uuids: [<uuid>, ...]  # entities currently hosted at this provider
@@ -232,9 +246,7 @@ deployment_accreditation:
 ---
 
 
-> **Architecture Update:** Section 4 of this document (Data/Capability Authorization Matrix) has been superseded by the **Unified Governance Matrix** ([doc 27](27-governance-matrix.md)). The governance matrix provides a more powerful, unified model that replaces the standalone matrix described here. The accreditation model (Sections 2-3) and zero trust interaction model (Section 5) remain current and are consumed by the governance matrix as inputs.
->
-> New implementations should reference doc 27 for data and capability boundary enforcement.
+> **Scope:** This document covers the accreditation model (Sections 2-3) and zero trust interaction model (Section 5). Data and capability boundary enforcement is specified in the [Unified Governance Matrix](27-governance-matrix.md) (doc 27), which consumes the accreditation and classification models defined here as inputs.
 
 ## 4. Data/Capability Authorization Matrix
 

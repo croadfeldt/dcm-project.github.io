@@ -1,10 +1,5 @@
 # DCM Data Model — Entity Relationships
 
-> **⚠️ Active Development Notice**
-> 
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
-> 
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 
 **Document Status:** ✅ Complete  
@@ -32,7 +27,7 @@ The DCM Entity Relationship model is the **universal mechanism for expressing re
 
 A single relationship model is used everywhere. There is no separate binding mechanism for storage, no separate dependency graph structure, no separate business data association mechanism. One model serves all relationship types across the full lifecycle — from pre-realization planning through to post-realization management, drift detection, cost rollup, and rehydration.
 
-This document supersedes the dependency graph concept from the Service Dependencies document for data structure purposes. The Service Dependencies document retains content on rehydration ordering and failure handling, which operate on the relationship graph defined here.
+This document defines the Entity Relationship Graph, which is the data structure underlying service dependency declaration (doc 07) and rehydration ordering. The Service Dependencies document retains content on rehydration ordering and failure handling, which operate on the relationship graph defined here.
 
 ---
 
@@ -311,7 +306,7 @@ When a consuming Tenant claims an available allocation, DCM creates a first-clas
 ```yaml
 allocated_entity:
   uuid: <uuid — consuming Tenant's own entity>
-  entity_type: allocated_resource
+  entity_type: infrastructure_resource  # ownership_model: allocation
   resource_type_uuid: <uuid of the allocated resource type>
   tenant_uuid: <Tenant A uuid>  # Belongs to the consuming Tenant
 

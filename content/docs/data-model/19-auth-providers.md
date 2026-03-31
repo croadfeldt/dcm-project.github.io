@@ -1,10 +1,5 @@
 # DCM Data Model — Authentication, Authorization, and Auth Providers
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).*
 
 **Document Status:** ✅ Complete  
 **Related Documents:** [Webhooks and Messaging](18-webhooks-messaging.md) | [Policy Organization](14-policy-profiles.md) | [Deployment and Redundancy](17-deployment-redundancy.md)

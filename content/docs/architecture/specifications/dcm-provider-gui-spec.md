@@ -1,5 +1,8 @@
 # DCM Provider Management GUI Specification
 
+> **AEP Alignment:** Provider API endpoints referenced in this spec follow [AEP](https://aep.dev) conventions — custom methods use colon syntax. See `schemas/openapi/dcm-admin-api.yaml` for the normative specification.
+
+
 **Document Status:** 🔄 In Progress
 **Document Type:** Specification — Provider Management Interface
 **Related Documents:** [Unified Provider Contract](../data-model/A-provider-contract.md) | [OIS Specification](dcm-operator-interface-spec.md) | [Registration Specification](dcm-registration-spec.md) | [Admin GUI Specification](dcm-admin-gui-spec.md) | [Credential Provider Model](../data-model/31-credential-provider-model.md)

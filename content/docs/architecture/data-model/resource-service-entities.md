@@ -1,14 +1,5 @@
----
-title: "DCM Data Model — Resource/Service Entities"
-type: docs
-weight: 6
----
+# DCM Data Model — Resource/Service Entities
 
-> **⚠️ Active Development Notice**
-> 
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
-> 
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 
 **Document Status:** ✅ Complete  
@@ -545,9 +536,8 @@ policy:
 
 This pre-authorization pattern allows providers to implement auto-scaling, auto-healing, and maintenance operations without requiring per-change manual approval, while keeping DCM's Realized Store accurate and traceable.
 
-### 7a.6 Updated Provider Lifecycle Events Table
+### 7a.6 Provider Lifecycle Events
 
-The following table supersedes the table in Section 7.2 with clearer DCM response categorization:
 
 | Event Type | Mechanism | DCM Response | Realized Store Updated? |
 |------------|-----------|-------------|------------------------|

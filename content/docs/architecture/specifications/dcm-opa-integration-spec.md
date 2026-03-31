@@ -1,5 +1,8 @@
 # DCM OPA Integration Specification
 
+> **AEP Alignment:** DCM API endpoints referenced in this spec follow [AEP](https://aep.dev) conventions. `resource_type` accepts FQN string or Registry UUID — DCM resolves internally. See `schemas/openapi/dcm-consumer-api.yaml` and `dcm-admin-api.yaml`.
+
+
 > **📋 Draft**
 >
 > This specification has been promoted from Work in Progress to Draft status. All questions resolved. All 7 policy types validated with working Rego examples. OPA/Rego confirmed as complete reference implementation. It is ready for implementation feedback but has not yet been formally reviewed for final release.

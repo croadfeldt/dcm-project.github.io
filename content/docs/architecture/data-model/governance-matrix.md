@@ -1,14 +1,5 @@
----
-title: "Unified Governance Matrix"
-type: docs
-weight: 27
----
+# DCM Data Model — Unified Governance Matrix
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference
@@ -40,7 +31,7 @@ The Unified Governance Matrix is the **single, declarative, multi-dimensional co
 
 Previous DCM documents established several overlapping control mechanisms: the Data/Capability Authorization Matrix (doc 26), sovereignty constraints in federation tunnels (doc 22), BBQ-001 sovereignty checks (doc 14), and profile-governed data boundaries. The Governance Matrix unifies all of these into a single model with a single evaluation algorithm and a single enforcement point.
 
-**This document supersedes** Section 4 of doc 26 (Data/Capability Authorization Matrix) for structural purposes. The accreditation model (Sections 2-3 of doc 26) and the zero trust interaction model (Section 5 of doc 26) remain current — the Governance Matrix consumes them as inputs.
+The accreditation model and data classification model from doc 26 are inputs to the evaluation algorithm defined here. The accreditation model (Sections 2-3 of doc 26) and the zero trust interaction model (Section 5 of doc 26) remain current — the Governance Matrix consumes them as inputs.
 
 **Key properties of the Governance Matrix:**
 

@@ -1,14 +1,5 @@
----
-title: "DCM Data Model — Storage Providers"
-type: docs
-weight: 11
----
+# DCM Data Model — Storage Providers
 
-> **⚠️ Active Development Notice**
-> 
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
-> 
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 
 **Document Status:** ✅ Complete  
@@ -29,6 +20,8 @@ weight: 11
 
 
 ---
+
+> **Operational guidance:** GitOps store-at-scale and migration are covered in [Operational Reference](41-operational-reference.md) Sections 1 and 2.
 
 ## 1. Purpose
 

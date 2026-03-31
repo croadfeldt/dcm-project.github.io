@@ -19,7 +19,7 @@
 |-----|-------|-----------|-----------|
 | **RFC 7519** | JSON Web Token (JWT) | Bearer token format for session tokens and API key tokens; claims carry actor_uuid, roles, tenant_uuid, exp | Normative |
 | **RFC 7517** | JSON Web Key (JWK) | Public key format for Auth Provider OIDC verification keys; JWKS endpoint for key discovery | Normative |
-| **RFC 7662** | OAuth 2.0 Token Introspection | `POST /api/v1/auth/introspect` — validates bearer tokens; response format `{active, session_uuid, actor_uuid, exp, roles}` | Normative |
+| **RFC 7662** | OAuth 2.0 Token Introspection | `POST /api/v1/auth:introspect` — validates bearer tokens; response format `{active, session_uuid, actor_uuid, exp, roles}` | Normative |
 | **RFC 6749** | OAuth 2.0 Authorization Framework | Authorization flow for OIDC Auth Providers; client credentials flow for service account API keys | Informative |
 | **RFC 4511** | Lightweight Directory Access Protocol (LDAP) | LDAP/FreeIPA/Active Directory Auth Provider integration; bind operations, search filters for group membership | Normative |
 | **RFC 7643** | SCIM 2.0 Core Schema | Actor and group provisioning schema for enterprise IdP integration; SCIM deprovision triggers session + credential revocation | Normative |

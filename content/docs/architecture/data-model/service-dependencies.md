@@ -1,14 +1,5 @@
----
-title: "DCM Data Model — Service Dependencies"
-type: docs
-weight: 7
----
+# DCM Data Model — Service Dependencies
 
-> **⚠️ Active Development Notice**
-> 
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
-> 
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 
 **Document Status:** ✅ Complete  
@@ -28,7 +19,7 @@ weight: 7
 
 
 
-> **Note:** The dependency graph data structure has been superseded by the universal Entity Relationship model defined in [Entity Relationships](09-entity-relationships.md). This document retains content specific to dependency declaration, rehydration ordering, and failure handling — all of which operate on the Entity Relationship Graph defined in that document.
+> **Scope:** This document covers dependency declaration, rehydration ordering, and failure handling. The underlying data structure is the Entity Relationship Graph defined in [Entity Relationships](09-entity-relationships.md).
 
 ---
 

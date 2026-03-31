@@ -1,8 +1,4 @@
----
-title: "Scheduled and Deferred Requests"
-type: docs
-weight: 37
----
+# DCM Data Model — Scheduled and Deferred Requests
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — Request Scheduling

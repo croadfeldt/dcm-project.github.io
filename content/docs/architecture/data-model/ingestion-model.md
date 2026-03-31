@@ -1,14 +1,5 @@
----
-title: "DCM Data Model — Ingestion Model"
-type: docs
-weight: 13
----
+# DCM Data Model — Ingestion Model
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete  
 **Related Documents:** [Context and Purpose](00-context-and-purpose.md) | [Four States](02-four-states.md) | [Resource/Service Entities](06-resource-service-entities.md) | [Entity Relationships](09-entity-relationships.md) | [Resource Grouping](08-resource-grouping.md)
@@ -33,7 +24,6 @@ weight: 13
 
 The DCM Ingestion Model is the **unified mechanism for bringing entities that exist outside DCM's lifecycle control into DCM's governance model**. It applies to three distinct sources:
 
-- **V1 Migration** — entities from a DCM V1 deployment that predate the mandatory Tenant model
 - **Brownfield Discovery** — entities discovered by a Service Provider that already exist in the infrastructure but are unknown to DCM
 - **Manual Import** — entities imported from external systems (CMDBs, spreadsheets, legacy records) during onboarding
 
@@ -51,7 +41,7 @@ All three sources follow the same pattern: ingest, enrich, and promote. The same
 
 ## 2. Design Principles
 
-**Unified model — minimum variance.** V1 migration and brownfield ingestion are the same fundamental operation. One model, one audit record structure, one set of governance policies.
+**Unified model — minimum variance.** brownfield ingestion and brownfield ingestion are the same fundamental operation. One model, one audit record structure, one set of governance policies.
 
 **Non-blocking.** Entities that cannot be immediately assigned a Tenant do not block migration or discovery. They land in the `__transitional__` Tenant and are resolved progressively. Migration does not require every entity to be assigned before any entity can proceed.
 
@@ -145,11 +135,11 @@ ingestion_record:
   resource_entity_uuid: <uuid>
   ingestion_timestamp: <ISO 8601>
 
-  ingestion_source: <v1_migration | brownfield_discovery | manual_import>
+  ingestion_source: <legacy_import | brownfield_discovery | manual_import>
 
-  # V1 migration fields (when ingestion_source: v1_migration)
-  v1_identifier: <original V1 identifier — name, IP, hostname, or DCM V1 UUID>
-  v1_metadata_snapshot: <key V1 fields captured at migration time>
+  # brownfield ingestion fields (when ingestion_source: legacy_import)
+  legacy_identifier: <original V1 identifier — name, IP, hostname, or DCM V1 UUID>
+  legacy_metadata_snapshot: <key V1 fields captured at migration time>
 
   # Brownfield discovery fields (when ingestion_source: brownfield_discovery)
   discovered_state_uuid: <uuid of Discovered State record>
@@ -202,75 +192,13 @@ When DCM ingests an entity, it attempts auto-assignment to a real Tenant using t
 |--------|-----------|-------------|
 | Explicit ownership metadata | High | Business unit, cost center, or team tag on the resource maps unambiguously to a Tenant |
 | Resource group membership | High | Resource belongs to a group that maps to a known Tenant |
-| Request history | High | V1 request record identifies the requesting team, which maps to a Tenant |
+| Request history | High | Legacy record identifies the requesting team, which maps to a Tenant |
 | Network / location context | Medium | Resource's location, VLAN, or network segment maps to a Tenant by convention |
 | Naming convention | Medium | Resource name matches a known Tenant naming pattern |
 | Provider context | Medium | Resource was provisioned by a known provider associated with a Tenant |
 | No signal found | Low | No auto-assignment possible — entity goes to `__transitional__` |
 
 Multiple signals can be combined. If signals conflict, the higher-confidence signal wins and the conflict is recorded in the ingestion record with `ingestion_confidence: medium` regardless of individual signal strengths.
-
----
-
-## 7. V1 Migration
-
-### 7.1 Overview
-
-V1 resources have no `tenant_uuid`. V2 requires one (`TEN-001`). The V1 migration process uses the ingestion model to assign every V1 resource a Tenant before it can participate in V2 operations.
-
-### 7.2 Resource Categories
-
-| Category | Description | Assignment Path |
-|----------|-------------|----------------|
-| **Auto-assignable** | Clear ownership signals — resource group, business unit, request history | Auto-assigned during migration analysis pass |
-| **Manually assignable** | Ambiguous signals — multiple possible owners, or medium-confidence signals only | Surfaced in admin assignment queue |
-| **Orphaned** | No signals — no ownership data available | Assigned to `__transitional__` |
-
-### 7.3 Migration Flow
-
-```
-V1 estate
-  │
-  ▼  Step 1 — Pre-migration analysis pass
-  │  Inventory all V1 resources
-  │  Attempt auto-assignment via signals (Section 6)
-  │  Classify each resource: auto_assignable | manually_assignable | orphaned
-  │  Produce migration readiness report
-  │
-  ▼  Step 2 — Auto-assignment
-  │  Create or map to existing V2 Tenants
-  │  Assign auto_assignable resources in bulk
-  │  Create ingestion_record per resource (ingestion_source: v1_migration)
-  │  State: INGESTED → ENRICHING (for auto-assigned)
-  │
-  ▼  Step 3 — Manual assignment queue
-  │  manually_assignable resources surfaced in admin UI
-  │  Administrators review and assign Tenants
-  │  Each assignment recorded in enrichment_history
-  │
-  ▼  Step 4 — Transitional fallback
-  │  orphaned resources → __transitional__ Tenant
-  │  ingestion_record.assignment_method: transitional
-  │  ingestion_record.ingestion_confidence: low
-  │  Governance timer starts
-  │
-  ▼  Step 5 — Enrichment and promotion
-  │  Relationships established, missing fields populated
-  │  Each entity reviewed and promoted when complete
-  │  State: ENRICHING → PROMOTED → OPERATIONAL
-  │
-  ▼  Migration complete when __transitional__ Tenant is empty
-```
-
-### 7.4 Migration System Policies
-
-| Policy | Rule |
-|--------|------|
-| `ING-001` | Every entity ingested into V2 from V1 must be assigned to exactly one Tenant — either a real Tenant or `__transitional__` — before it is eligible for new V2 requests |
-| `ING-002` | Entities in `INGESTED` or `ENRICHING` state may not be the parent resource for a new allocated resource claim |
-| `ING-003` | The `__transitional__` Tenant is system-managed and cannot be deleted, renamed, or used for new resource provisioning |
-| `ING-004` | Every ingested entity must carry an `ingestion_record` in its provenance chain |
-| `ING-005` | Entities in `__transitional__` for longer than `max_residency_days` must trigger the configured escalation action |
 
 ---
 
@@ -351,7 +279,7 @@ Ingestion interacts with the Four States model as follows:
 
 | Ingestion Source | States Involved | Flow |
 |-----------------|----------------|------|
-| V1 Migration | Intent → Requested → (no Realized yet) | V1 records treated as incomplete Requested State; migration creates minimal Realized State |
+| brownfield ingestion | Intent → Requested → (no Realized yet) | Legacy records treated as incomplete Requested State; migration creates minimal Realized State |
 | Brownfield Discovery | Discovered → Realized | Discovered State is promoted to Realized State at promotion |
 | Manual Import | None initially | Entity stub created; no prior state records; Realized State created at promotion from import data |
 
@@ -391,7 +319,6 @@ In all cases: once an entity reaches `PROMOTED`, it has a Realized State record 
 - **Four States** — Discovered State is the entry point for brownfield ingestion; Realized State is the output of promotion
 - **Brownfield** — existing infrastructure not yet under DCM lifecycle management
 - **Drift Detection** — begins for brownfield entities at the moment of promotion
-- **V1 Migration** — migration of pre-Tenant DCM V1 entities to V2 using the ingestion model
 - **Greening the Brownfield** — the progressive process of bringing unmanaged infrastructure under DCM lifecycle control
 
 

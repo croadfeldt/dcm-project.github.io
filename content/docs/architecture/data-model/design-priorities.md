@@ -1,8 +1,4 @@
----
-title: "DCM Design Priorities"
-type: docs
-weight: -11
----
+# DCM Design Priorities
 
 **Document Status:** ✅ Stable — Foundational reference
 **Document Type:** Architecture Reference — Design Philosophy
@@ -227,7 +223,7 @@ External systems (ServiceNow, Jira, email workflows, Slack bots) connect to DCM 
 The Admin API approval endpoint is designed to be called by external systems, not only by humans in a DCM UI:
 
 ```
-POST /api/v1/admin/approvals/{approval_uuid}/vote
+POST /api/v1/admin/approvals/{approval_uuid}:vote
 Authorization: Bearer <token>     # any actor who is a member of the required DCMGroup
 
 {

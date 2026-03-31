@@ -1,10 +1,5 @@
 # DCM Data Model — Resource Type Hierarchy and Service Catalog
 
-> **⚠️ Active Development Notice**
-> 
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
-> 
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 
 **Document Status:** ✅ Complete  
@@ -455,7 +450,7 @@ All definitions in the Resource Type Hierarchy follow the universal DCM versioni
 | Component | Trigger |
 |---|---|
 | **Major** | Breaking changes to the contract — removing fields, changing field types, changing required/optional status of universal fields |
-| **Minor** | Additive changes, backward compatible — adding new optional fields, adding new conditional fields, adding new extension points |
+| **Minor** | Additive changes — adding new optional fields, adding new conditional fields, adding new extension points |
 | **Revision** | Data or configuration changes with no contract impact — updating descriptions, updating constraints that don't break existing data, updating metadata |
 
 ### 9.2 Version Constraints in Requests
@@ -502,3 +497,25 @@ Once a version is published it is immutable. Any change — even a documentation
 ---
 
 *Document maintained by the DCM Project. For questions or contributions see [GitHub](https://github.com/dcm-project).*
+
+---
+
+## Resource Type Reference — Consumer vs Internal Format
+
+When consumers reference a resource type — in API calls, policy conditions, or query filters — DCM accepts two forms:
+
+| Form | Example | Notes |
+|------|---------|-------|
+| **FQN string** (recommended) | `Compute.VirtualMachine` | Stable across deployments; human-readable; returned by the service catalog |
+| **Registry UUID** | `a1b2c3d4-e5f6-...` | Deployment-specific; obtained from catalog API; suitable for programmatic use |
+
+DCM resolves either form to the canonical `(resource_type_uuid, resource_type_name)` pair during request assembly. The resolution happens in the **Request Payload Processor** before layer enrichment begins. Unresolvable references are rejected at validation time with a `422 Unprocessable Entity` response and code `RESOURCE_TYPE_NOT_FOUND`.
+
+**Internal representation:** All internal DCM data — entity records, dispatch payloads, audit records — always carry **both** `resource_type_uuid` and `resource_type_name` (FQN). The consumer-facing accept-both model is purely at the API boundary; internally DCM always uses the canonical pair.
+
+**Dispatch to operators:** The `CreateRequest` and `UpdateRequest` payloads sent to Service Providers always include both:
+- `resource_type_uuid` — the Registry UUID
+- `resource_type_name` — the FQN string
+
+Operators MUST NOT accept only one form; both will always be present.
+

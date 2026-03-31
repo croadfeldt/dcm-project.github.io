@@ -1,14 +1,5 @@
----
-title: "Policy Organization: Groups, Profiles, and Policy Providers"
-type: docs
-weight: 14
----
+# DCM Data Model — Policy Organization: Groups, Profiles, and Policy Providers
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 > **Universal Group Model:** Policy Groups (`group_class: policy_collection`) and Policy Profiles (`group_class: policy_profile`) are expressions of the [Universal Group Model](15-universal-groups.md). The structures defined in this document remain authoritative for policy-specific behavior; the universal model adds composability, cross-type membership, and the ability to include policy groups within composite groups.
 
@@ -30,6 +21,8 @@ weight: 14
 
 
 ---
+
+> **Standards and Compliance Reference:** See [Standards and Compliance Catalog](40-standards-catalog.md) for the complete mapping of compliance frameworks (HIPAA, PCI DSS, FedRAMP, NIST SP 800-53, GDPR, DoD IL4) to DCM profiles and system requirements.
 
 ## 1. Purpose
 

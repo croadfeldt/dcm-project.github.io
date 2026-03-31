@@ -1,14 +1,5 @@
----
-title: "DCM Data Model — Authentication, Authorization, and Auth Providers"
-type: docs
-weight: 19
----
+# DCM Data Model — Authentication, Authorization, and Auth Providers
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).*
 
 **Document Status:** ✅ Complete  
 **Related Documents:** [Webhooks and Messaging](18-webhooks-messaging.md) | [Policy Organization](14-policy-profiles.md) | [Deployment and Redundancy](17-deployment-redundancy.md)
@@ -199,7 +190,7 @@ auth_provider:
           dcm_role: platform_admin
 ```
 
-### 4.3 LDAP / FreeIPA
+### 4.3 LDAP / FreeIPA (RFC 4511)
 
 ```yaml
 auth_provider:
@@ -514,7 +505,7 @@ dcm auth configure \
 
 | # | Question | Impact | Status |
 |---|----------|--------|--------|
-| 1 | Should DCM support SCIM for automated user provisioning from enterprise IdPs? | Enterprise integration | ✅ Resolved — SCIM 2.0 optional capability; provisions actors and group memberships; roles not SCIM-provisioned; suspend on deprovision default (AUTH-012) |
+| 1 | Should DCM support SCIM for automated user provisioning from enterprise IdPs? | Enterprise integration | ✅ Resolved — SCIM 2.0 (RFC 7643 / RFC 7644) optional capability; provisions actors and group memberships; roles not SCIM-provisioned; suspend on deprovision default (AUTH-012) |
 | 2 | How does Auth Provider failover interact with in-flight requests during the transition? | Reliability | ✅ Resolved — in-flight requests complete on cached tokens; failover chain for new auth; session TTL respected during outage; all providers unavailable → reject (AUTH-013) |
 | 3 | Should MFA enforcement be per-operation (step-up MFA) or per-session? | Security UX | ✅ Resolved — two-tier MFA: per-session + step-up; policy declares which operations require step-up; PT10M step-up token TTL; profile-governed defaults (AUTH-014) |
 | 4 | Should the built-in Auth Provider's local user store be backed by a pluggable database? | Architecture | ✅ Resolved — pluggable storage backend; SQLite for minimal/dev; PostgreSQL for standard+; encryption required for fsi/sovereign; local store for bootstrap/service accounts only (AUTH-015) |

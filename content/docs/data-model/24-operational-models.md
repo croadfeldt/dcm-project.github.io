@@ -1,10 +1,5 @@
 # DCM Data Model — Operational Models
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference
@@ -307,7 +302,7 @@ event_triggered_discovery:
 Platform admins and SREs can trigger discovery manually:
 
 ```
-POST /api/v1/admin/discovery/trigger
+POST /api/v1/admin/discovery:trigger
 
 {
   "scope": "entity | resource_type | provider | tenant",

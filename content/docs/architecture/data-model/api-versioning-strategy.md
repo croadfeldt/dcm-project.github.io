@@ -1,8 +1,4 @@
----
-title: "API Versioning Strategy"
-type: docs
-weight: 34
----
+# DCM Data Model — API Versioning Strategy
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — API Versioning and Lifecycle
@@ -42,7 +38,7 @@ Individual endpoints are not independently versioned. If a single endpoint needs
 Non-breaking changes within a major version are documented in the API changelog but do not change the URL. Clients do not need to take any action for non-breaking changes.
 
 The changelog follows semantic versioning conventions:
-- **Minor change**: new optional fields, new endpoints, expanded enum values with backward-compatible defaults
+- **Minor change**: new optional fields, new endpoints, expanded enum values with version-compatible defaults
 - **Revision**: documentation corrections, clarifications, non-functional specification updates
 
 ---
@@ -309,7 +305,7 @@ provider_registration:
 
 ### 7.2 OIS Compatibility
 
-DCM maintains backward compatibility with registered OIS versions during the support lifecycle. A DCM instance running OIS v2 must continue to dispatch to providers registered on OIS v1 during the deprecation window.
+DCM maintains version-compatible with registered OIS versions during the support lifecycle. A DCM instance running OIS v2 must continue to dispatch to providers registered on OIS v1 until the version is sunset.
 
 When the OIS version is incremented:
 1. DCM announces the new OIS version via the event `governance.ois_version_released`
@@ -323,17 +319,15 @@ Providers that expose their own management APIs (beyond the standard OIS surface
 
 ---
 
-## 8. Client Migration Path
+## 8. Version Upgrade Path
 
-### 8.1 Migration Guide Structure
-
-Each new major version publishes a migration guide accessible at:
+When a new major API version is published, a machine-readable change log is available at:
 
 ```
 GET /api/v{N}/migration-guide
 ```
 
-The migration guide is machine-readable JSON listing all breaking changes from the previous version:
+This endpoint returns all breaking changes from the previous major version:
 
 ```json
 {
@@ -344,21 +338,17 @@ The migration guide is machine-readable JSON listing all breaking changes from t
       "change_id": "BC-001",
       "type": "field_removed",
       "endpoint": "GET /api/v2/resources/{uuid}",
-      "description": "Field 'legacy_id' removed from response. Use 'entity_uuid' instead.",
-      "migration": "Replace references to 'legacy_id' with 'entity_uuid'",
-      "affected_since": "2026-06-01"
+      "description": "Field 'legacy_id' removed — use 'entity_uuid' instead"
     }
   ],
-  "non_breaking_additions": [ ... ],
-  "sunset_date_of_previous_version": "2027-06-01"
+  "new_capabilities": []
 }
 ```
 
-### 8.2 Parallel Operation
-
-During the deprecation window, clients may run v1 and v2 in parallel — for example, migrating one service at a time. Both versions return consistent data from the same underlying DCM data stores. There are no data synchronization concerns between versions.
+Clients declare the API version they target via the `Accept-Version` header or URL prefix. DCM supports all non-sunset major versions simultaneously. When a version reaches sunset, responses include `Deprecation` and `Sunset` headers (RFC 8594) before support is withdrawn.
 
 ---
+
 
 ## 9. Internal API Versioning
 
@@ -383,7 +373,7 @@ DCM internal component APIs (Control Plane components communicating with each ot
 | `VER-006` | The `latest` version alias is available but must not be recommended for production use. Production clients must pin to a specific version. |
 | `VER-007` | Preview endpoints are not stable. They may change or be removed without a major version increment. They are identified by the `/preview/` path segment. |
 | `VER-008` | Every new major version must publish a machine-readable migration guide at `/api/v{N}/migration-guide`. |
-| `VER-009` | DCM must maintain dispatch compatibility with providers registered on supported OIS versions during the OIS deprecation window. |
+| `VER-009` | DCM must maintain dispatch compatibility with providers registered on supported OIS versions until the OIS version is sunset. |
 
 ---
 

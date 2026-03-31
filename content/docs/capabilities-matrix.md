@@ -84,6 +84,13 @@
 | PRV-007 | Provider Health Reporting | — | Expose health check endpoint; report availability | Monitor provider health; configure trust score updates | PRV-001 |
 | PRV-008 | Sovereignty Declaration Maintenance | — | Notify DCM when sovereignty data changes within declared SLA | Monitor sovereignty changes; trigger re-evaluation | PRV-001 |
 | PRV-009 | Meta Provider Orchestration | — | Compose sub-providers to deliver higher-order services; manage composition visibility | Configure composite provider federation eligibility | PRV-001, PRV-003 |
+| PRR-001 | OpenAPI Spec Declaration (GATE-SP-01) | — | Declare OpenAPI spec URL at registration; spec must be machine-readable and reachable | Validate spec URL reachability during approval pipeline | PRV-001 |
+| PRR-002 | Healthy API at Activation (GATE-SP-02) | — | Health endpoint returns `{"status": "healthy"}` at activation time | Enforce health check as activation precondition | PRV-001, HLT-001 |
+| PRR-003 | State Management Callback (GATE-SP-03) | — | Implement realized_state_push callback at all conformance levels | Validate callback endpoint reachability during approval | PRV-001 |
+| PRR-004 | Tenant Metadata Endpoint (GATE-SP-04) | — | Implement GET /api/v1/tenants/{uuid}/metadata returning usage data | Require for standard+ profile activation; enforce quota integration | PRV-001 |
+| PRR-005 | Prometheus Metrics (GATE-SP-05) | — | Expose required metric families at declared metrics_endpoint | Validate metric presence during approval; gate standard+ activation | PRV-001, HLT-005 |
+| PRR-006 | AEP.DEV Linting (GATE-SP-06) | — | Pass AEP linter against OpenAPI spec with no errors before registration; include linting report URL | Gate standard+ activation on linting pass; block activation on errors | PRV-001 |
+| PRR-007 | Multi-Tenant Dispatch (GATE-SP-07) | — | Accept tenant_uuid in all dispatch payloads; return tenant-scoped resources | Gate standard+ activation on multi-tenant compatibility test | PRV-001 |
 
 ---
 
@@ -538,6 +545,33 @@
 ---
 
 
+## 36. Workload Analysis
+
+| ID | Capability | Consumer | Service Provider | Platform/Admin | Depends On |
+|----|-----------|---------|---------|---------------|-----------|| WLA-001 | Automated Workload Classification | View workload profile for owned resources; see archetype, resource type match, confidence | Report resource metadata via discovery for classification input | Configure classification ruleset version; review low-confidence classifications manually | DRC-001, INF-001 |
+| WLA-002 | Migration Readiness Scoring | View containerization score and migration blockers for owned resources | Report workload characteristics that inform migration scoring | Configure migration readiness thresholds; integrate MTA Information Provider | WLA-001 |
+| WLA-003 | MTA Information Provider Integration | — | Implement workload_analysis information type OR delegate to MTA | Register MTA as Information Provider; configure analysis trigger policies | WLA-001, INF-001 |
+| WLA-004 | On-Demand Re-Analysis | Request re-analysis when resource role changes (`POST /resources/{uuid}/workload-profile:analyze`) | — | Trigger re-analysis for any resource; override archetype manually with reason | WLA-001 |
+| WLA-005 | WorkloadProfile Audit Chain | View analysis history for owned resources | — | Query full analysis history including superseded profiles | WLA-001, AUD-001 |
+| WLA-006 | Low-Confidence Manual Review Gate | Receive notification when owned resource requires manual classification | — | Review and resolve low-confidence classifications; unblock ingestion | WLA-001, LCM-001 |
+
+---
+
+
+## 37. Accreditation Monitoring
+
+| ID | Capability | Consumer | Service Provider | Platform/Admin | Depends On |
+|----|-----------|---------|---------|---------------|-----------|| ACM-001 | Tier 1 External Registry Verification | — | Declare `external_registry_id` at registration for FedRAMP, CMMC, ISO 27001 | Configure registry poll intervals; review status change alerts; manage `external_registry_id` accuracy | PRV-001, ACR-001 |
+| ACM-002 | Tier 2 Document Currency Verification | — | Maintain current `certificate_ref` and `audit_report_ref` URLs pointing to valid, accessible documents | Configure `max_age` per framework; review document expiry alerts; upload new reports when notified | PRV-001, ACR-001 |
+| ACM-003 | Tier 3 Contract Webhook Integration | — | Configure contract management webhook for BAA and DoD IL accreditations | Register contract system; configure inbound webhook credential; receive BAA/contract lifecycle events | PRV-001, ACR-001 |
+| ACM-004 | Verification Staleness Enforcement | — | Ensure monitoring infrastructure can reach DCM to deliver verification events | Configure stale_after thresholds and stale_action per profile; enforce sovereign/fsi minimum tier requirements | ACM-001, ACR-001 |
+| ACM-005 | Immediate Revocation on External Revoke | Receive notification when provider accreditation is revoked; understand service impact | — | Review `accreditation.status_changed` events; confirm immediate revocations; trigger recovery policy | ACM-001, ACR-001 |
+| ACM-006 | Verification Currency in Scoring | — | Maintain verification currency to maximize accreditation richness score | Monitor verification multiplier impact on provider placement; prioritize externally verified providers | ACM-001, SMX-001 |
+| ACM-007 | Manual Override in Air-Gapped Mode | — | — | Manually update `last_verified_at` with justification in air-gapped deployments; maintain audit trail of manual verifications | ACR-001, AUD-001 |
+
+---
+
+
 ## Capability Count Summary
 
 | Domain | Capabilities |
@@ -604,11 +638,75 @@
 | Scheduled and Deferred Requests | 6 |
 | Request Dependency Graph | 6 |
 | DCM Self-Health | 6 |
+| Identity and Access Management | 21 |
+| Service Catalog | 7 |
+| Request Lifecycle Management | 10 |
+| Provider Contract and Realization | 16 |
+| Resource Lifecycle Management | 7 |
+| Drift Detection and Remediation | 5 |
+| Policy Management | 7 |
+| Data Layer Management | 5 |
+| Information and Data Integration | 6 |
+| Ingestion and Brownfield Management | 4 |
+| Audit and Compliance | 5 |
+| Observability and Operations | 5 |
+| Storage and State Management | 6 |
+| DCM Federation and Multi-Instance | 5 |
+| Platform Governance and Administration | 7 |
+| Accreditation Management | 6 |
+| Zero Trust and Security Posture | 6 |
+| Unified Governance Matrix | 7 |
+| Drift Reconciliation | 5 |
+| Federated Contribution Model | 7 |
+| Scoring Model | 10 |
+| Meta Provider Composability | 8 |
+| Credential Provider Model | 12 |
+| Authority Tier Model | 12 |
+| Event Catalog | 7 |
+| API Versioning | 8 |
+| Session Revocation | 11 |
+| Internal Component Authentication | 8 |
+| Scheduled and Deferred Requests | 6 |
+| Request Dependency Graph | 6 |
+| DCM Self-Health | 6 |
+| Identity and Access Management | 21 |
+| Service Catalog | 7 |
+| Request Lifecycle Management | 10 |
+| Provider Contract and Realization | 16 |
+| Resource Lifecycle Management | 7 |
+| Drift Detection and Remediation | 5 |
+| Policy Management | 7 |
+| Data Layer Management | 5 |
+| Information and Data Integration | 6 |
+| Ingestion and Brownfield Management | 4 |
+| Audit and Compliance | 5 |
+| Observability and Operations | 5 |
+| Storage and State Management | 6 |
+| DCM Federation and Multi-Instance | 5 |
+| Platform Governance and Administration | 7 |
+| Accreditation Management | 6 |
+| Zero Trust and Security Posture | 6 |
+| Unified Governance Matrix | 7 |
+| Drift Reconciliation | 5 |
+| Federated Contribution Model | 7 |
+| Scoring Model | 10 |
+| Meta Provider Composability | 8 |
+| Credential Provider Model | 12 |
+| Authority Tier Model | 12 |
+| Event Catalog | 7 |
+| API Versioning | 8 |
+| Session Revocation | 11 |
+| Internal Component Authentication | 8 |
+| Scheduled and Deferred Requests | 6 |
+| Request Dependency Graph | 6 |
+| DCM Self-Health | 6 |
 | Operational Reference | 4 |
 | Web Interfaces | 14 |
 | ITSM Integration | 7 |
 | Provider Callback Authentication | 10 |
-| **Total** | **269** |
+| Workload Analysis | 5 |
+| Accreditation Monitoring | 6 |
+| **Total** | **287** |
 
 ---
 

@@ -1,5 +1,16 @@
 # DCM Operator SDK — API Design
 
+**Document Status:** ✅ Complete
+**Document Type:** SDK Reference (Go)
+**Related Documents:** [Operator Interface Specification](dcm-operator-interface-spec.md) | [Kubernetes Compatibility](11-kubernetes-compatibility.md) | [Provider Callback Auth](../data-model/43-provider-callback-auth.md) | [Registration Specification](dcm-registration-spec.md)
+
+> **AEP Alignment:** DCM interaction uses colon-syntax custom methods (`:approve`, `:suspend`).
+> `operation_uuid == request_uuid` — Operations polling uses `GET /api/v1/operations/{uuid}`.
+> `resource_type` accepts both FQN string (`Compute.VirtualMachine`) and Registry UUID;
+> DCM resolves either form internally. See `schemas/openapi/dcm-operator-api.yaml`
+> for the normative operator-facing OpenAPI specification.
+
+
 
 > ## 📋 Draft — Promoted from Work in Progress
 >
@@ -640,7 +651,55 @@ func (r *ClusterReconciler) Reconcile(
 
 ---
 
+## 11. Callback Credential Management
+
+The SDK manages the provider callback credential lifecycle automatically.
+
+### 11.1 Credential Storage
+
+```go
+// CallbackCredential is managed internally by the SDK.
+// Operators do not need to handle credential rotation manually.
+type CallbackCredential struct {
+    Value      string    // Bearer token — never logged
+    ValidUntil time.Time // Pre-rotation begins at 50% of lifetime
+    UUID       string    // For audit correlation
+}
+```
+
+### 11.2 Automatic Rotation
+
+The SDK initiates credential rotation before expiry (at 50% of the credential lifetime). During the transition window, the SDK accepts both the old and new credentials simultaneously. Operators do not need to handle rotation — the SDK does it transparently.
+
+```go
+// The SDK emits a credential rotation event when rotation completes.
+// Operators can subscribe to be notified (e.g., to update secret stores).
+sdk.OnCredentialRotated(func(old, new CallbackCredential) {
+    // Optional: persist new credential to external secret store
+    log.Info("credential rotated", "new_uuid", new.UUID)
+})
+```
+
+### 11.3 entity_uuid and resource_id
+
+The SDK ensures `dcm_entity_uuid` is echoed in every response and callback. `resource_id` is the operator's own stable identifier. DCM uses `dcm_entity_uuid` for all internal routing — `resource_id` is stored by DCM as a correlation handle but never used for routing or identity.
+
+```go
+// The SDK automatically populates dcm_entity_uuid from the CreateRequest.
+// Operators set resource_id to their own stable identifier.
+resp := &CreateResponse{
+    ResourceID:   myInternalID,           // operator-assigned
+    DCMEntityUUID: req.DCMEntityUUID,     // echoed from CreateRequest — SDK validates this
+    LifecycleState: StatePROVISIONING,
+}
+```
+
+---
+
 ## 10. Open Questions
+
+> All questions resolved. See Resolution Notes below.
+
 
 | # | Question | Impact | Status |
 |---|----------|--------|--------|

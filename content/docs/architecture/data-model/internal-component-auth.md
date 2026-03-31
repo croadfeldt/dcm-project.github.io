@@ -1,8 +1,4 @@
----
-title: "Internal Component Authentication"
-type: docs
-weight: 36
----
+# DCM Data Model — Internal Component Authentication
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — Zero Trust Internal Auth

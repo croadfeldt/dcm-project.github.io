@@ -1,5 +1,8 @@
 # DCM Registration Specification
 
+> **AEP Alignment:** Registration API endpoints follow [AEP](https://aep.dev) conventions — custom methods use colon syntax (`POST /admin/registrations/{uuid}:approve`). `resource_type` in provider capabilities accepts FQN string or Registry UUID. See `schemas/openapi/dcm-admin-api.yaml` for the normative specification.
+
+
 > **📋 Draft**
 >
 > This specification has been promoted from Work in Progress to Draft status. All questions resolved. Complete registration pipeline for all 11 provider types with full capability declaration schemas and federation trust model. It is ready for implementation feedback but has not yet been formally reviewed for final release.
@@ -345,8 +348,8 @@ Registration enters PENDING_APPROVAL
 Platform admin notification dispatched (urgency: medium)
 Platform admin reviews in Admin API or Flow GUI:
   GET /api/v1/admin/registrations/pending
-  POST /api/v1/admin/registrations/{registration_uuid}/approve
-  POST /api/v1/admin/registrations/{registration_uuid}/reject
+  POST /api/v1/admin/registrations/{registration_uuid}:approve
+  POST /api/v1/admin/registrations/{registration_uuid}:reject
 On approval: → ACTIVE
 On rejection: → REJECTED with required reason field
 On timeout (approval_timeout): → REJECTED with reason "approval_timeout"
@@ -414,6 +417,32 @@ service_provider_capabilities:
     discovery_endpoint: /discover
     discovery_method: api_query | passive_event | hybrid
     supports_incremental_discovery: true
+
+  monitoring:
+    # Prometheus metrics endpoint — required for 1.0 readiness
+    metrics_endpoint: /metrics            # must return Prometheus text format
+    metrics_port: 8080                    # or same as operator endpoint
+    
+    # Required metric families (must be present at activation):
+    required_metrics:
+      - dcm_provider_dispatches_total      # {resource_type, outcome}
+      - dcm_provider_dispatch_duration_seconds  # {resource_type, quantile}
+      - dcm_provider_realizations_total    # {resource_type, status}
+      - dcm_provider_health_status         # 1=healthy, 0=unhealthy
+    
+    # Optional but recommended:
+    optional_metrics:
+      - dcm_provider_queue_depth           # pending dispatch requests
+      - dcm_provider_capacity_remaining    # {resource_type}
+    
+    # AEP.DEV linting — required for 1.0 readiness gate
+    aep_linting:
+      passes_aep_linting: true            # must pass aep.dev linter before activation
+      linting_report_ref: <url>           # link to linting report
+    
+    # Tenant metadata endpoint — required for multi-tenant readiness
+    tenant_metadata_endpoint: /api/v1/tenants/{tenant_uuid}/metadata
+    # Returns: usage by tenant, quota consumed, active resources by type
 
   naturalization:
     target_format: openstack_nova | vmware_vsphere | custom
@@ -760,7 +789,7 @@ certificate_rotation:
   pre_rotation_warning: P14D        # warn provider P14D before expiry
 
 # Rotation flow:
-POST /api/v1/provider/certificates/rotate
+POST /api/v1/provider/certificates:rotate
 {
   "new_certificate_pem": "<PEM>",
   "transition_window": "P7D"
@@ -813,6 +842,44 @@ Immediate effect:
 ```
 
 ---
+
+### 7.2 Provider 1.0 Readiness Gates
+
+Before a Service Provider can be activated in `standard`, `prod`, `fsi`, or `sovereign`
+profiles, the following readiness gates must pass. These align with the DCM roadmap's
+1.0 criteria for Service Provider deployment:
+
+| Gate | Requirement | Profiles Required |
+|------|------------|-------------------|
+| `GATE-SP-01` | Simple OpenAPI Spec — declared at registration, URL reachable | all |
+| `GATE-SP-02` | Healthy API — health endpoint returns `{"status": "healthy"}` at activation | all |
+| `GATE-SP-03` | State Management — implements realized_state_push callback | all |
+| `GATE-SP-04` | Tenant Metadata — endpoint declared or implemented | standard+ |
+| `GATE-SP-05` | Prometheus Metrics — required metric families present at declared endpoint | standard+ |
+| `GATE-SP-06` | AEP.DEV Linting — OpenAPI spec passes AEP linter with no errors | standard+ |
+| `GATE-SP-07` | Multi-Tenant Ready — accepts tenant_uuid in all dispatch payloads | standard+ |
+
+DCM evaluates readiness gates automatically during the approval pipeline. A provider
+that fails a gate is rejected with a `READINESS_GATE_FAILED` error listing which
+gates failed and what is needed to pass.
+
+**Required metric families (GATE-SP-05):**
+
+```
+dcm_provider_dispatches_total{resource_type, outcome}
+dcm_provider_dispatch_duration_seconds{resource_type, quantile}
+dcm_provider_realizations_total{resource_type, status}
+dcm_provider_health_status   # 1=healthy, 0=unhealthy/degraded
+```
+
+**AEP linting (GATE-SP-06):**
+Run the AEP linter against the provider's OpenAPI spec before registration.
+Common failures: slash-verb paths instead of colon syntax, missing page_size
+on list endpoints, 202 responses without Operation resource on async operations.
+The linting report URL should be included in the monitoring capability declaration.
+
+---
+
 
 ## 8. Error Model
 

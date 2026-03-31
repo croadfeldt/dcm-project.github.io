@@ -1,10 +1,5 @@
 # DCM Data Model — Notification Model
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference
@@ -41,7 +36,7 @@ This document defines:
 - The notification payload structure — the unified envelope all Notification Providers receive
 - The delivery pipeline — from event trigger through audience resolution through provider delivery
 
-This model supersedes the standalone outbound webhook model in doc 18. Outbound webhooks are now one delivery channel of the Notification Provider, not a parallel mechanism.
+Outbound webhooks are one delivery channel within this model, implemented via the Notification Provider.
 
 ---
 
@@ -547,7 +542,7 @@ Provider Update Notifications (doc 06, Section 7a) integrate with the notificati
 **When provider update requires consumer approval:**
 - `provider_update.requires_approval` fires → Owner notified (action required)
 - `action.type: approve`
-- `action.action_url` points to `/api/v1/resources/{uuid}/provider-notifications/{uuid}/approve`
+- `action.action_url` points to `/api/v1/resources/{uuid}/provider-notifications/{uuid}:approve`
 - `action.deadline` set per policy (default PT24H — if no response, escalate)
 
 **On resolution:**

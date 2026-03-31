@@ -42,7 +42,7 @@ Operators conforming to this specification function as Service Providers within 
 
 ## 1. Introduction
 
-> **OIS Versioning:** Providers declare the OIS version they implement in capability registration (`ois_version`). DCM maintains dispatch compatibility with all supported OIS versions during the deprecation window. See [API Versioning Strategy](../data-model/34-api-versioning-strategy.md) Section 7.
+> **OIS Versioning:** Providers declare the OIS version they implement in capability registration (`ois_version`). DCM maintains dispatch compatibility with all supported OIS versions. See [API Versioning Strategy](../data-model/34-api-versioning-strategy.md) Section 7.
 
 
 ### 1.1 Motivation
@@ -217,7 +217,7 @@ provider_registration:
 ```yaml
 # Success response
 provider_registration_response:
-  provider_id: <DCM-assigned UUID — stable across re-registrations>
+  provider_uuid: <DCM-assigned UUID — stable across re-registrations>
   name: <confirmed name>
   status: <registered|updated>
   conformance_level_accepted: <1|2|3>
@@ -309,7 +309,7 @@ DCM maintains an internal capacity rating per operator, per service type, per lo
 
 ### 5.2 Capacity Registration
 
-**DCM endpoint:** `POST /api/v1/providers/{provider_id}/capacity`
+**DCM endpoint:** `POST /api/v1/providers/{provider_uuid}/capacity`
 
 ```yaml
 capacity_report:
@@ -374,6 +374,7 @@ DCM sends the Requested State payload to the operator. The operator naturalizes 
 create_request:
   request_id: <uuid — DCM request UUID for correlation>
   tenant_uuid: <uuid — DCM Tenant that owns this resource>
+  # Both resource_type_uuid and resource_type_name are always present — DCM resolves from consumer input
   resource_type_uuid: <uuid>
   resource_type_name: Storage.Database
   spec:

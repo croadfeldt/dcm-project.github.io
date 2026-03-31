@@ -1,8 +1,4 @@
----
-title: "Operational Reference: GitOps Scale, Store Migration, Disaster Recovery"
-type: docs
-weight: 41
----
+# DCM Data Model — Operational Reference
 
 **Document Status:** 🔄 In Progress
 **Document Type:** SRE Reference — GitOps Scale, Store Migration, Disaster Recovery

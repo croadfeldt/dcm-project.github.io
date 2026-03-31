@@ -603,35 +603,21 @@ Organizations using OCM for cluster lifecycle management get cluster management 
 
 ---
 
-## 9. Migration Path — Standalone SPA → RHDH
+## 9. Deployment Options
 
-Organizations starting with the standalone SPA can migrate to RHDH mode without data migration:
+DCM supports two frontend deployment modes that can be selected at initial deployment:
 
+**Standalone SPA** — DCM deploys its own React-based consumer portal. No RHDH dependency. Suitable for environments where RHDH is not present.
+
+**RHDH Mode** — DCM plugins are loaded into an existing RHDH instance. The RHDH Developer Hub becomes the consumer portal surface. Recommended for organizations already running RHDH.
+
+Both modes use the same DCM APIs and the same authentication model. The choice is a deployment configuration, not an architectural difference.
+
+```yaml
+# dcm-config.yaml
+frontend:
+  mode: standalone_spa | rhdh
+  rhdh_base_url: https://rhdh.internal  # only required for rhdh mode
 ```
-Phase 1 — Standalone SPA
-  DCM deployed; standalone React app as consumer portal
-  All DCM functionality operational
-
-Phase 2 — Install RHDH
-  RHDH deployed in same cluster
-  Configure Keycloak/RHSSO (shared IdP)
-
-Phase 3 — Load DCM Dynamic Plugins
-  Add DCM plugins to RHDH app-config
-  No RHDH rebuild required (Dynamic Plugins)
-  DCM entities appear in RHDH catalog
-
-Phase 4 — Auto-generate Templates
-  DCM catalog items become Backstage Software Templates
-  Developers start using RHDH "Create" for DCM requests
-
-Phase 5 — Decommission standalone SPA
-  Users have migrated to RHDH
-  Standalone SPA can be retired
-```
-
-Total migration effort: primarily configuration. No data migration, no API changes, no DCM control plane changes.
 
 ---
-
-*Document maintained by the DCM Project. For questions or contributions see [GitHub](https://github.com/dcm-project).*

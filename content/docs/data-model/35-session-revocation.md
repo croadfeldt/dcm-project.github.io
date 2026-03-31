@@ -195,7 +195,7 @@ session_revocation_registry:
 DCM's Ingress layer exposes a token introspection endpoint for internal components and external systems that need to validate a token without maintaining their own cache:
 
 ```
-POST /api/v1/auth/introspect
+POST /api/v1/auth:introspect
 
 Authorization: Bearer <api-key-with-introspection-scope>
 Content-Type: application/json
@@ -283,7 +283,7 @@ Response 404: session not found or does not belong to this actor
 ### 6.5 Admin: Force Revoke Session(s)
 
 ```
-POST /api/v1/admin/actors/{actor_uuid}/revoke-sessions
+POST /api/v1/admin/actors/{actor_uuid}:revoke-sessions
 
 {
   "scope": "all | session",
@@ -342,7 +342,7 @@ Session revocation (this document) and credential revocation (doc 31, CPX-001–
 | `AUTH-017` | Session revocation must propagate to the Session Revocation Registry within the profile-governed SLA: minimal PT5M, standard PT1M, prod PT30S, fsi PT10S, sovereign PT5S. |
 | `AUTH-018` | All DCM components that accept bearer tokens must check the Session Revocation Registry on each request. Cache age must not exceed the profile-governed maximum (sovereign: no cache). |
 | `AUTH-019` | Emergency session revocation (security_event trigger) fires immediately with no grace period. The `auth.security_session_revoked` event has `urgency: critical` and is non-suppressable. |
-| `AUTH-020` | The token introspection endpoint (`POST /api/v1/auth/introspect`) must be authenticated. Access requires an actor or service account with the `introspection` scope. |
+| `AUTH-020` | The token introspection endpoint (`POST /api/v1/auth:introspect`) must be authenticated. Access requires an actor or service account with the `introspection` scope. |
 | `AUTH-021` | When concurrent session limits are enforced, the oldest session is revoked before the new session is created. The evicted actor is notified via Notification Provider if configured. |
 | `AUTH-022` | Refresh tokens are invalidated when their parent session is revoked. A revoked refresh token returns 401 on exchange; it cannot be used to create a new session. |
 

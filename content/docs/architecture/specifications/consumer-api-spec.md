@@ -19,6 +19,12 @@ The Consumer API is the boundary between the Application domain and the Control 
 
 ---
 
+> **AEP Alignment:** This specification follows [AEP](https://aep.dev) conventions.
+> Custom methods use colon syntax (`POST /resources/{name}:suspend`).
+> Async operations return an `Operation` resource (AEP-136 LRO) — poll `operation.name` for completion.
+> List pagination uses `page_size` and `page_token` parameters.
+> See the normative OpenAPI specification: `schemas/openapi/dcm-consumer-api.yaml`
+
 ## 1. Introduction
 
 ### 1.1 Scope
@@ -94,14 +100,14 @@ If DCM receives two requests with the same `Idempotency-Key` from the same authe
 
 **Which endpoints support `Idempotency-Key`:**
 - `POST /api/v1/requests` — resource request submission
-- `POST /api/v1/credentials/{uuid}/rotate` — credential rotation request
-- `POST /api/v1/resources/{uuid}/rehydrate` — rehydration trigger
+- `POST /api/v1/credentials/{uuid}:rotate` — credential rotation request
+- `POST /api/v1/resources/{uuid}:rehydrate` — rehydration trigger
 
 ### 1.6 Rate Limiting
 
 Rate limits are profile-governed and apply per authenticated actor:
 
-| Profile | Requests/minute | Burst allowance | Rate limit header |
+| Profile | Requests/minute | Burst allowance | Rate page_size header |
 |---------|----------------|-----------------|-------------------|
 | `minimal` | 60 | 20 | Yes |
 | `standard` | 300 | 100 | Yes |
@@ -120,7 +126,7 @@ X-RateLimit-Reset: 1749340800
 
 {
   "error": "rate_limit_exceeded",
-  "message": "Request rate limit exceeded. Retry after 12 seconds.",
+  "message": "Request rate page_size exceeded. Retry after 12 seconds.",
   "retry_after_seconds": 12
 }
 ```
@@ -146,7 +152,7 @@ Include `X-DCM-Request-ID` when contacting support. Use `X-DCM-Correlation-ID` t
   "items": [...],           // always "items" regardless of resource type
   "total": 142,             // total matching records (before pagination)
   "page_size": 25,
-  "next_cursor": "<string>" // null if no more pages; use as ?cursor= on next request
+  "next_page_token": "<string>" // null if no more pages; use as ?page_token= on next request
 }
 ```
 
@@ -286,7 +292,7 @@ Response 204 No Content
 
 ```http
 # Token introspection (RFC 7662) — for internal components and trusted integrations
-POST /api/v1/auth/introspect
+POST /api/v1/auth:introspect
 Authorization: Bearer <service-token>
 
 { "token": "<token-to-inspect>" }
@@ -477,7 +483,8 @@ Request body:
   }
 }
 
-Response 202 Accepted:
+Response 200 OK — returns `Operation`:
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "request_uuid": "<uuid>",
   "entity_uuid": "<uuid>",            # the UUID the entity will have when realized
@@ -635,7 +642,8 @@ Cancellation is only available before the PROVISIONING state. Once a provider is
 ```
 DELETE /api/v1/requests/{request_uuid}
 
-Response 202 Accepted:
+Response 200 OK — returns `Operation`:
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "request_uuid": "<uuid>",
   "status": "CANCELLING",
@@ -791,7 +799,7 @@ Response 200:
       "submitted_at": "<ISO 8601>",
       "status": "pending_approval",
       "changed_fields": ["memory_gb"],
-      "approval_url": "/api/v1/resources/{entity_uuid}/provider-notifications/{notification_uuid}/approve"
+      "approval_url": "/api/v1/resources/{entity_uuid}/provider-notifications/{notification_uuid}:approve"
     }
   ]
 }
@@ -812,7 +820,8 @@ Request body:
   "reason": "Renamed to align with new naming convention"
 }
 
-Response 202 Accepted:
+Response 200 OK — returns `Operation`:
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "update_request_uuid": "<uuid>",
   "entity_uuid": "<uuid>",
@@ -832,7 +841,7 @@ Response 422 Unprocessable (if field is not editable):
 ### 5.4 Suspend Resource
 
 ```
-POST /api/v1/resources/{entity_uuid}/suspend
+POST /api/v1/resources/{entity_uuid}:suspend
 
 Request body:
 {
@@ -840,7 +849,8 @@ Request body:
   "auto_resume_at": "2026-03-16T06:00:00Z"    # optional
 }
 
-Response 202 Accepted:
+Response 200 OK — returns `Operation`:
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "entity_uuid": "<uuid>",
   "status": "SUSPENDING",
@@ -860,7 +870,8 @@ Request body:
                     # cannot force decommission if required stakes exist
 }
 
-Response 202 Accepted:
+Response 200 OK — returns `Operation`:
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "entity_uuid": "<uuid>",
   "status": "DECOMMISSIONING"
@@ -884,7 +895,7 @@ Response 409 Conflict (required stakes or dependencies active):
 ### 5.6 Trigger Rehydration
 
 ```
-POST /api/v1/resources/{entity_uuid}/rehydrate
+POST /api/v1/resources/{entity_uuid}:rehydrate
 
 Request body:
 {
@@ -898,7 +909,8 @@ Request body:
   "reason": "Provider migration — EU-WEST-Prod-1 being decommissioned"
 }
 
-Response 202 Accepted:
+Response 200 OK — returns `Operation`:
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "rehydration_request_uuid": "<uuid>",
   "entity_uuid": "<uuid>",
@@ -950,7 +962,7 @@ Response 200:
   ]
 }
 
-POST /api/v1/resources/{entity_uuid}/provider-notifications/{notification_uuid}/approve
+POST /api/v1/resources/{entity_uuid}/provider-notifications/{notification_uuid}:approve
 {
   "decision": "approve | reject",
   "reason": "<optional human-readable reason>"
@@ -1031,7 +1043,7 @@ Response 202 Accepted:
 Decommissions all resources matching a filter. Creates individual decommission requests for each resource. Useful for teardown of environments or project cleanup.
 
 ```
-POST /api/v1/resources/bulk-decommission
+POST /api/v1/resources:bulk-decommission
 
 Request body:
 {
@@ -1061,7 +1073,8 @@ Response 200 (dry_run=true):
   ]
 }
 
-Response 202 Accepted (dry_run=false):
+Response 200 OK — returns `Operation` (dry_run=false):
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "bulk_decommission_uuid": "<uuid>",
   "decommission_requests": [
@@ -1078,14 +1091,15 @@ Response 202 Accepted (dry_run=false):
 Resumes a suspended resource. The resource must be in SUSPENDED lifecycle state.
 
 ```
-POST /api/v1/resources/{entity_uuid}/resume
+POST /api/v1/resources/{entity_uuid}:resume
 
 Request body:
 {
   "reason": "Maintenance window complete"
 }
 
-Response 202 Accepted:
+Response 200 OK — returns `Operation`:
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "entity_uuid": "<uuid>",
   "status": "RESUMING"
@@ -1106,7 +1120,7 @@ Response 409 Conflict:
 Transfers ownership of a resource entity to a different Tenant. Both Tenants must have an active cross-tenant authorization record permitting the transfer. The receiving Tenant admin must confirm the transfer.
 
 ```
-POST /api/v1/resources/{entity_uuid}/transfer
+POST /api/v1/resources/{entity_uuid}:transfer
 
 Request body:
 {
@@ -1135,8 +1149,8 @@ Response 403 Forbidden:
 Target Tenant admin accepts or rejects:
 
 ```
-POST /api/v1/resources/transfers/{transfer_uuid}/accept
-POST /api/v1/resources/transfers/{transfer_uuid}/reject
+POST /api/v1/resources/transfers/{transfer_uuid}:accept
+POST /api/v1/resources/transfers/{transfer_uuid}:reject
 {
   "reason": "<optional>"
 }
@@ -1149,7 +1163,7 @@ POST /api/v1/resources/transfers/{transfer_uuid}/reject
 Extends the TTL of a resource entity that has a lifecycle time constraint declared. Extension is subject to policy — a GateKeeper may reject or cap the extension.
 
 ```
-POST /api/v1/resources/{entity_uuid}/extend-ttl
+POST /api/v1/resources/{entity_uuid}:extend-ttl
 
 Request body:
 {
@@ -1205,7 +1219,7 @@ Response 200:
       "expires_at": "<ISO 8601>",
       "time_remaining": "P2DT4H",
       "on_expiry_action": "decommission",
-      "extend_url": "/api/v1/resources/{entity_uuid}/extend-ttl"
+      "extend_url": "/api/v1/resources/{entity_uuid}:extend-ttl"
     }
   ],
   "total": 3
@@ -1256,7 +1270,7 @@ Response 200:
 Marks a drift record as acknowledged. The entity remains drifted — this signals the owner has reviewed it.
 
 ```
-POST /api/v1/resources/{entity_uuid}/drift/{drift_uuid}/acknowledge
+POST /api/v1/resources/{entity_uuid}/drift/{drift_uuid}:acknowledge
 {
   "reason": "Reviewing with provider before deciding on action"
 }
@@ -1274,14 +1288,15 @@ Response 200:
 Accepts the discovered state as the new authoritative desired state. Creates a new Requested State and Realized State snapshot reflecting the discovered values. Resolves the drift record.
 
 ```
-POST /api/v1/resources/{entity_uuid}/drift/{drift_uuid}/accept
+POST /api/v1/resources/{entity_uuid}/drift/{drift_uuid}:accept
 {
   "accept_all_fields": true,         # accept all drifted fields
   "accept_fields": ["fields.memory_gb"],   # or select specific fields
   "reason": "Auto-scale event was legitimate; accepting new memory configuration"
 }
 
-Response 202 Accepted:
+Response 200 OK — returns `Operation`:
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "drift_uuid": "<uuid>",
   "status": "resolved",
@@ -1295,12 +1310,13 @@ Response 202 Accepted:
 Submits a revert request — dispatches a new request to restore the resource to its Realized State values.
 
 ```
-POST /api/v1/resources/{entity_uuid}/drift/{drift_uuid}/revert
+POST /api/v1/resources/{entity_uuid}/drift/{drift_uuid}:revert
 {
   "reason": "Unauthorized change — reverting to declared state"
 }
 
-Response 202 Accepted:
+Response 200 OK — returns `Operation`:
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "drift_uuid": "<uuid>",
   "revert_request_uuid": "<uuid>",
@@ -1653,7 +1669,7 @@ Response 200:
   "read_at": "<ISO 8601>"
 }
 
-POST /api/v1/notifications/read-all    # mark all unread as read
+POST /api/v1/notifications:read-all    # mark all unread as read
 
 Response 200:
 {
@@ -1832,7 +1848,7 @@ All error responses follow a consistent structure:
 | 422 | `policy_rejected` | GateKeeper policy rejected the request |
 | 422 | `constraint_violated` | Field value violates declared constraint |
 | 422 | `ttl_extension_rejected` | Policy rejected or capped the TTL extension request |
-| 429 | `rate_limit_exceeded` | Actor has exceeded request rate limit |
+| 429 | `rate_limit_exceeded` | Actor has exceeded request rate page_size |
 | 503 | `assembly_unavailable` | Request Payload Processor temporarily unavailable |
 | 503 | `search_index_degraded` | Search index unavailable; use authoritative_store_ref fallback |
 
@@ -2000,12 +2016,13 @@ Response 410 Gone:  { "error": "credential_revoked_or_expired" }
 ### 9b.3 Request Credential Rotation
 
 ```
-POST /api/v1/credentials/{credential_uuid}/rotate
+POST /api/v1/credentials/{credential_uuid}:rotate
 {
   "reason": "Scheduled rotation per security policy"
 }
 
-Response 202 Accepted:
+Response 200 OK — returns `Operation`:
+> Returns `Operation` resource. Poll `operation.name` for completion.
 {
   "old_credential_uuid": "<uuid>",
   "new_credential_uuid": "<uuid>",
@@ -2028,3 +2045,80 @@ The Consumer API defines three conformance levels, mirroring the Operator Interf
 ---
 
 *Document maintained by the DCM Project. For questions or contributions see [GitHub](https://github.com/dcm-project).*
+
+
+## Operations — Polling Long-Running Requests
+
+All async mutating operations return an `Operation` resource. The `operation.name` field
+is the stable polling URL: `GET /api/v1/operations/{operation_uuid}`.
+
+**Key relationship:** `operation_uuid == request_uuid`. The same UUID is used in both the
+AEP-standard Operation endpoint and the DCM-native Request Status endpoint. Two polling
+views are available — use whichever fits your client:
+
+| Endpoint | Schema | Best for |
+|----------|--------|----------|
+| `GET /api/v1/operations/{uuid}` | `Operation` — `done`, `metadata`, `response/error` | AEP-compatible clients, simple polling |
+| `GET /api/v1/requests/{uuid}/status` | `RequestStatus` — `pipeline_stage`, full status history, `entity_uuid` | DCM-native clients, debugging, rich UI |
+
+Both endpoints reflect the same underlying state. When `done: true`, `operation.response`
+contains the realized entity (same as the resource returned by `GET /api/v1/resources/{entity_uuid}`).
+
+```
+POST /api/v1/requests
+
+Response 200 OK — returns Operation:
+{
+  "name": "/api/v1/operations/{request_uuid}",
+  "done": false,
+  "metadata": {
+    "stage": "INITIATED",
+    "resource_uuid": "{entity_uuid}",   // set immediately on entity creation
+    "request_uuid": "{request_uuid}"    // == operation_uuid
+  }
+}
+```
+
+**Polling `GET /api/v1/operations/{operation_uuid}`:**
+
+```
+# While in progress:
+{
+  "name": "/api/v1/operations/{uuid}",
+  "done": false,
+  "metadata": {
+    "stage": "PROVISIONING",
+    "progress_pct": 45,
+    "resource_uuid": "{entity_uuid}",
+    "request_uuid": "{uuid}"
+  }
+}
+
+# On success:
+{
+  "name": "/api/v1/operations/{uuid}",
+  "done": true,
+  "metadata": { "stage": "OPERATIONAL", "resource_uuid": "{entity_uuid}", "request_uuid": "{uuid}" },
+  "response": { ... }   // the realized entity
+}
+
+# On failure:
+{
+  "name": "/api/v1/operations/{uuid}",
+  "done": true,
+  "metadata": { "stage": "FAILED", "request_uuid": "{uuid}" },
+  "error": {
+    "code": "PROVIDER_TIMEOUT",
+    "message": "Provider did not respond within the configured timeout",
+    "details": []
+  }
+}
+```
+
+**Polling guidance:** Use exponential backoff (1s → 2s → 5s → 10s → 30s).
+For push-based updates, subscribe to the `request.progress_updated` webhook event.
+For real-time browser monitoring, use the SSE stream: `GET /api/v1/requests/{uuid}/stream`.
+
+**Cancellation:** `DELETE /api/v1/requests/{uuid}` cancels an in-progress operation.
+The request enters CANCELLING state; cancellation success depends on provider support.
+

@@ -1,10 +1,5 @@
 # DCM Data Model — Universal Group Model
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. Concepts, structures, and specifications documented here represent work in progress and are subject to change as design decisions are finalized. Open questions are explicitly tracked and decisions are recorded as they are made.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete  
 **Related Documents:** [Context and Purpose](00-context-and-purpose.md) | [Resource Grouping](08-resource-grouping.md) | [Entity Relationships](09-entity-relationships.md) | [Policy Organization](14-policy-profiles.md)
@@ -391,7 +386,7 @@ All groups are stored in a single **Group Registry** — a GitOps store followin
 
 ### 6.2 Class-Filtered API Views
 
-The universal registry exposes class-filtered views that preserve backward compatibility with existing API consumers:
+The universal registry exposes class-filtered views for convenience:
 
 | Endpoint | Equivalent Query |
 |----------|----------------|
@@ -402,22 +397,6 @@ The universal registry exposes class-filtered views that preserve backward compa
 | `GET /federations` | `GET /groups?group_class=federation` |
 
 Existing API references continue to work unchanged. New API consumers can use the universal endpoint.
-
----
-
-## 7. Migration from Current Constructs
-
-Existing constructs migrate to the universal model with UUID preservation:
-
-| Current Construct | Migration | UUID Preserved? |
-|------------------|-----------|----------------|
-| Tenant entity | `group_class: tenant_boundary` | Yes |
-| DCM Default Resource Group | `group_class: resource_grouping` | Yes |
-| Custom Resource Group | `group_class: resource_grouping, group_subclass: <custom_type>` | Yes |
-| Policy Group | `group_class: policy_collection` | Yes |
-| Policy Profile | `group_class: policy_profile` | Yes |
-
-Migration uses the standard ingestion model — existing constructs are ingested as `ingestion_source: migration` with `ingestion_confidence: high` (UUID preservation, no ambiguity).
 
 ---
 

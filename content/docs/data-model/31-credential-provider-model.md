@@ -1,10 +1,5 @@
 # DCM Data Model — Credential Provider Model
 
-> **⚠️ Active Development Notice**
->
-> The DCM data model and architecture documentation are actively being developed. This document specifies the Credential Provider model — the issuance contract, credential lifecycle, rotation model, revocation propagation, and how credentials flow through the DCM pipeline.
->
-> Contributions, feedback, and discussion are welcome via [GitHub](https://github.com/dcm-project).
 
 **Document Status:** ✅ Complete
 **Document Type:** Architecture Reference — Credential Provider Specification
