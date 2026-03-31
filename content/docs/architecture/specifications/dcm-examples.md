@@ -1056,3 +1056,1134 @@ Response 202: { "registration_uuid": "reg-001", "status": "VALIDATING",
 ---
 
 *Document maintained by the DCM Project. For questions or contributions see [GitHub](https://github.com/dcm-project).*
+
+# Section 6 — Provider Type Examples
+
+## 6.1 Storage Provider — State Store Write and Read
+
+A Storage Provider persists and streams DCM internal state. This example shows
+the full lifecycle: DCM writing a Requested State record to a PostgreSQL-backed
+Storage Provider, followed by the Request Orchestrator reading it back.
+
+**Provider registration excerpt:**
+
+```yaml
+storage_provider_registration:
+  provider_type: storage_provider
+  display_name: "Primary PostgreSQL State Store"
+  endpoint: https://pg-state.internal:5432
+  storage_sub_type: relational_state
+  stores_owned:
+    - store_type: requested_state
+    - store_type: realized_state
+    - store_type: intent_state
+  consistency_guarantee: strong          # synchronous write confirmation
+  replication:
+    strategy: synchronous_replica
+    replica_endpoints:
+      - https://pg-state-replica-1.internal:5432
+      - https://pg-state-replica-2.internal:5432
+  provenance_emission: true              # emits audit event on every write
+```
+
+**Write: DCM persists a Requested State record**
+
+```
+DCM Request Orchestrator
+  │
+  ▼ POST https://pg-state.internal/api/v1/records
+    Authorization: Bearer <dcm-interaction-credential>
+    Content-Type: application/json
+    {
+      "record_type": "requested_state",
+      "entity_uuid": "a1b2c3d4-...",
+      "tenant_uuid": "t1t2t3t4-...",
+      "request_uuid": "r1r2r3r4-...",
+      "payload": { ... assembled request payload ... },
+      "written_at": "2026-03-31T10:00:00Z"
+    }
+
+Provider response:
+    {
+      "record_uuid": "s1s2s3s4-...",
+      "written_at": "2026-03-31T10:00:00.042Z",
+      "replicated": true
+    }
+
+Provider emits provenance event:
+    event_type: storage.record_written
+    record_type: requested_state
+    record_uuid: s1s2s3s4-...
+    entity_uuid: a1b2c3d4-...
+    store_provider_uuid: <provider-uuid>
+```
+
+**Read: Drift scheduler retrieves Realized State for comparison**
+
+```
+DCM Drift Scheduler
+  │
+  ▼ GET https://pg-state.internal/api/v1/records
+    ?entity_uuid=a1b2c3d4-...
+    &record_type=realized_state
+    &version=latest
+    Authorization: Bearer <dcm-interaction-credential>
+
+Provider response:
+    {
+      "record_uuid": "z9z8z7z6-...",
+      "entity_uuid": "a1b2c3d4-...",
+      "record_type": "realized_state",
+      "payload": { ... realized state snapshot ... },
+      "written_at": "2026-03-31T09:55:00Z",
+      "supersedes_uuid": "y8y7y6y5-..."
+    }
+```
+
+---
+
+## 6.2 Auth Provider — OIDC Cutover (GitHub OAuth → Corporate OIDC)
+
+DCM's auth configuration is a versioned artifact. Adding a new Auth Provider
+and cutting over is a standard GitOps PR workflow — no downtime.
+
+**Step 1: Register the corporate OIDC provider**
+
+```yaml
+# GitOps PR: auth-providers/corporate-oidc-v1.yaml
+auth_provider:
+  handle: "auth-providers/corporate-oidc"
+  version: "1.0.0"
+  status: developing               # shadow mode — not yet enforced
+  provider_type: oidc
+  display_name: "Corporate OIDC (Keycloak)"
+  endpoint: https://sso.corp.internal/realms/dcm
+  client_id: dcm-control-plane
+  client_secret_ref: credential://vault/dcm/oidc-client-secret
+  scopes: [openid, profile, email, groups]
+  group_claim: "dcm_groups"       # claim containing DCM group memberships
+  mfa_required: true
+  profile_overlay: standard       # overrides to fsi/sovereign possible
+```
+
+**Step 2: Shadow evaluation (parallel run)**
+
+```
+Platform Admin: PATCH /api/v1/admin/auth-providers/{uuid}
+  { "status": "proposed" }
+
+DCM response:
+  Both providers now evaluate all logins in parallel.
+  auth.session_created events include shadow_auth_result for comparison.
+  Divergences (user authenticated by one provider but not the other)
+  are surfaced via governance.auth_shadow_divergence events.
+
+After 72 hours of shadow evaluation:
+  Shadow report: 1,847 logins evaluated
+    Converged: 1,845 (99.9%)
+    Diverged: 2 (both: OIDC rejected due to missing group claim — fixed)
+```
+
+**Step 3: Activate and retire GitHub OAuth**
+
+```
+Platform Admin: PATCH /api/v1/admin/auth-providers/{oidc-uuid}
+  { "status": "active" }
+
+Platform Admin: PATCH /api/v1/admin/auth-providers/{github-uuid}
+  { "status": "deprecated" }
+
+DCM response:
+  Corporate OIDC: primary, enforced
+  GitHub OAuth: accepted for 30 days (configured sunset), then retired
+  All existing sessions: revoked (auth.session_revoked × N users)
+  Users: re-authenticate on next request
+```
+
+---
+
+## 6.3 Credential Provider — SSH Key Issuance After VM Realization
+
+After a VM is realized, the Credential Provider issues an SSH key pair to the
+requesting consumer — scoped to that specific entity.
+
+**Flow:**
+
+```
+1. Consumer: POST /api/v1/requests
+     catalog_item_uuid: <compute-vm-catalog-item>
+     fields: { cpu: 4, ram_gb: 16, os: "RHEL 9.4" }
+
+2. Policy evaluation — Transformation policy injects credential requirement:
+     fields.credential_requirements:
+       - credential_type: ssh_key
+         issued_to: requesting_actor
+         scope: [ssh_access]
+         ttl: P90D             # 90-day key lifetime
+
+3. VM realization completes → entity_uuid: vm-abc123
+
+4. DCM dispatches credential issuance sub-request:
+   POST https://vault.internal/api/v1/credentials
+     {
+       "credential_type": "ssh_key",
+       "entity_uuid": "vm-abc123",
+       "issued_to_actor_uuid": "actor-xyz",
+       "scope": ["ssh_access"],
+       "ttl": "P90D"
+     }
+
+5. Credential Provider (HashiCorp Vault) response:
+     {
+       "credential_uuid": "cred-456",
+       "public_key": "ssh-ed25519 AAAA...",
+       "private_key_ref": "vault://dcm/ssh-keys/cred-456/private",
+       "valid_until": "2026-06-30T00:00:00Z"
+     }
+
+6. Consumer retrieves credential:
+   GET /api/v1/resources/vm-abc123/credentials/cred-456/value
+     Authorization: Bearer <consumer-session>
+
+   Response:
+     {
+       "credential_uuid": "cred-456",
+       "credential_type": "ssh_key",
+       "public_key": "ssh-ed25519 AAAA...",
+       "private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...",
+       "valid_until": "2026-06-30T00:00:00Z"
+     }
+   Note: private_key delivered once at retrieval; not stored in DCM.
+```
+
+**Rotation at P45D (50% of lifetime):**
+
+```
+Credential Provider fires: credential.rotation_due
+  credential_uuid: cred-456
+  entity_uuid: vm-abc123
+  days_until_expiry: 45
+
+DCM Policy: Transformation → auto-issue renewal credential
+  New credential_uuid: cred-789
+  valid_until: 2026-09-30 (new 90-day window)
+
+credential.rotated event → consumer notified via webhook
+Old credential (cred-456): valid_until unchanged, both active during overlap
+At valid_until: cred-456 → expired, credential.expired event
+```
+
+---
+
+## 6.4 Meta Provider — Three-Tier Web Application Stack
+
+A Meta Provider composes multiple atomic service providers into a single catalog
+item. The consumer requests one thing; DCM orchestrates the constituent parts.
+
+**Meta Provider registration (compound service):**
+
+```yaml
+meta_provider_registration:
+  provider_type: meta_provider
+  display_name: "Three-Tier Web App Stack"
+  resource_types_composed:
+    - fqn: ApplicationStack.WebApp
+      version: "1.0.0"
+      constituents:
+        - component_id: db
+          resource_type: Compute.VirtualMachine
+          provided_by: external            # DCM selects a compute provider
+          depends_on: []
+          required_for_delivery: required
+
+        - component_id: app
+          resource_type: Compute.VirtualMachine
+          provided_by: external
+          depends_on: [db]                 # waits for db realization
+          inject_from:
+            - component: db
+              field: realized_fields.primary_ip
+              into: fields.db_host
+          required_for_delivery: required
+
+        - component_id: lb
+          resource_type: Network.LoadBalancer
+          provided_by: external
+          depends_on: [app]
+          inject_from:
+            - component: app
+              field: realized_fields.primary_ip
+              into: fields.backend_pool[0]
+          required_for_delivery: required
+
+        - component_id: dns
+          resource_type: Network.DNSRecord
+          provided_by: external
+          depends_on: [lb]
+          inject_from:
+            - component: lb
+              field: realized_fields.vip
+              into: fields.record_value
+          required_for_delivery: optional  # stack delivered without DNS if it fails
+```
+
+**Consumer request:**
+
+```
+POST /api/v1/requests
+  {
+    "catalog_item_uuid": "<webapp-stack-catalog-item>",
+    "fields": {
+      "app_name": "payments-api",
+      "environment": "prod",
+      "db_size": "large",
+      "app_replicas": 3
+    }
+  }
+```
+
+**What DCM orchestrates (transparent to consumer):**
+
+```
+Request 1 → db VM (dispatched immediately)
+  Realized: db.primary_ip = 10.0.1.5
+
+Request 2 → app VM (dispatched after db realized)
+  fields.db_host = 10.0.1.5 (injected from db realization)
+  Realized: app.primary_ip = 10.0.1.10
+
+Request 3 → load balancer (dispatched after app realized)
+  fields.backend_pool[0] = 10.0.1.10 (injected)
+  Realized: lb.vip = 203.0.113.42
+
+Request 4 → DNS record (dispatched after lb realized)
+  fields.record_value = 203.0.113.42 (injected)
+  Realized: dns.fqdn = payments-api.corp.example.com
+
+Consumer entity: ApplicationStack.WebApp
+  Status: OPERATIONAL
+  Constituent entities: [db-uuid, app-uuid, lb-uuid, dns-uuid]
+  Logical endpoint: payments-api.corp.example.com
+```
+
+---
+
+## 6.5 ITSM Provider — ServiceNow Change Request Lifecycle
+
+An ITSM Provider creates and manages change tickets in ServiceNow as part of
+DCM request lifecycle gates. The ITSM ticket becomes the approval gate.
+
+**Provider registration:**
+
+```yaml
+itsm_provider_registration:
+  provider_type: itsm_provider
+  display_name: "ServiceNow — Production ITSM"
+  endpoint: https://corp.service-now.com
+  itsm_system: servicenow
+  supported_actions:
+    - create_change_request
+    - update_change_request
+    - close_change_request
+    - get_approval_status
+  field_mapping_ref: "itsm-mappings/servicenow-prod-v1.yaml"
+  cmdb_ci_type_map:
+    Compute.VirtualMachine: cmdb_ci_server
+    Network.VLAN: cmdb_ci_network
+```
+
+**Lifecycle: DCM request requiring Change Approval:**
+
+```
+1. Consumer: POST /api/v1/requests
+     fields: { ... VM configuration ... }
+
+2. GateKeeper policy fires (prod tenant + restricted network):
+     action: require_itsm_approval
+     itsm_provider_uuid: <servicenow-provider-uuid>
+     change_type: standard
+     risk_level: medium
+
+3. DCM → ITSM Provider: create_change_request
+     POST https://corp.service-now.com/api/dcm/v1/changes
+     {
+       "short_description": "DCM: Provision Compute.VirtualMachine",
+       "dcm_request_uuid": "req-abc123",
+       "change_type": "standard",
+       "risk": "medium",
+       "implementation_plan": "DCM automated provisioning",
+       "configuration_item": "vm-payments-prod-07",
+       "requested_by": "jane.smith@corp.example.com"
+     }
+
+   ServiceNow response:
+     { "change_number": "CHG0012345", "state": "Assess", "sys_id": "abc123" }
+
+4. DCM request status: AWAITING_EXTERNAL_APPROVAL
+   Consumer notified: "Change request CHG0012345 created — awaiting approval"
+
+5. ServiceNow CAB approves → webhook to DCM:
+   POST /api/v1/admin/itsm-events
+   {
+     "itsm_provider_uuid": "<uuid>",
+     "change_number": "CHG0012345",
+     "dcm_request_uuid": "req-abc123",
+     "event_type": "approved",
+     "approved_by": "change.manager@corp.example.com",
+     "approved_at": "2026-03-31T14:00:00Z"
+   }
+
+6. DCM resumes request dispatch → VM provisioned
+   ITSM Provider: update_change_request → state: Implement
+
+7. VM realized → ITSM Provider: close_change_request
+     { "state": "Closed Complete", "close_notes": "DCM: entity vm-xyz OPERATIONAL" }
+```
+
+---
+
+## 6.6 Message Bus Provider — External System Event Bridge
+
+A Message Bus Provider bridges DCM events to external messaging infrastructure.
+This example shows DCM publishing entity lifecycle events to an Apache Kafka topic.
+
+**Provider registration:**
+
+```yaml
+message_bus_provider_registration:
+  provider_type: message_bus_provider
+  display_name: "Kafka Event Bridge — Infrastructure Events"
+  endpoint: https://kafka-bridge.internal:9092
+  protocol: kafka
+  subscribed_event_types:
+    - entity.lifecycle_changed
+    - drift.detected
+    - accreditation.status_changed
+    - provider.status_changed
+  topic_mapping:
+    entity.lifecycle_changed: dcm.infrastructure.lifecycle
+    drift.detected: dcm.infrastructure.drift
+    accreditation.status_changed: dcm.compliance.accreditation
+    provider.status_changed: dcm.infrastructure.providers
+  delivery_guarantee: at_least_once
+  dead_letter_topic: dcm.dlq
+```
+
+**Flow: VM reaches OPERATIONAL → Kafka message published:**
+
+```
+DCM internal: entity.lifecycle_changed event fires
+  entity_uuid: vm-abc123
+  resource_type: Compute.VirtualMachine
+  from_state: PROVISIONING
+  to_state: OPERATIONAL
+  tenant_uuid: t1t2...
+
+Message Bus Provider receives event, publishes to Kafka:
+  Topic: dcm.infrastructure.lifecycle
+  Key: vm-abc123
+  Value: {
+    "event_type": "entity.lifecycle_changed",
+    "entity_uuid": "vm-abc123",
+    "resource_type": "Compute.VirtualMachine",
+    "from_state": "PROVISIONING",
+    "to_state": "OPERATIONAL",
+    "tenant_uuid": "t1t2...",
+    "timestamp": "2026-03-31T10:05:33Z",
+    "dcm_instance_uuid": "<dcm-uuid>"
+  }
+
+External consumer (monitoring pipeline) processes message:
+  → Updates CMDB record
+  → Triggers monitoring agent installation
+  → Notifies application team
+```
+
+**Dead letter handling:**
+
+```
+Kafka publish fails (broker unreachable):
+  Message Bus Provider: retry with exponential backoff (3 attempts)
+  After threshold: publish to dcm.dlq with failure metadata
+  Fire: message_bus.delivery_failed (urgency: medium) → Platform Admin
+  DCM: event stored in Message Bus Provider's local queue for replay
+```
+
+---
+
+# Section 7 — Policy Type Examples
+
+## 7.1 Transformation Policy — Automatic Data Enrichment
+
+Transformation policies modify the request payload before dispatch. They run
+after validation passes and before placement selection.
+
+**Use case:** Auto-inject the required OS image version based on the requested
+OS name and the current approved version from an Information Provider.
+
+```rego
+package dcm.policy.transform.os_image_injection
+
+import future.keywords.if
+
+# When consumer requests a VM with os_name but no os_image_uuid:
+transform if {
+    input.payload.resource_type == "Compute.VirtualMachine"
+    input.payload.fields.os_name != null
+    input.payload.fields.os_image_uuid == null
+}
+
+output := {
+    "output_type": "transformation",
+    "field_injections": [{
+        "field": "fields.os_image_uuid",
+        "value": data.information_providers.os_registry.current_approved[
+            input.payload.fields.os_name
+        ],
+        "source": "policy/transform/os-image-injection",
+        "immutable": true      # consumer cannot override after injection
+    }],
+    "audit_annotations": [{
+        "key": "os_image_injected_at",
+        "value": time.now_ns()
+    }]
+}
+```
+
+**In practice:**
+
+```
+Consumer submits:
+  { "os_name": "RHEL 9", "cpu": 4, "ram_gb": 16 }
+
+After transformation:
+  { "os_name": "RHEL 9", "cpu": 4, "ram_gb": 16,
+    "os_image_uuid": "img-rhel9-20260315",   ← injected
+    "_provenance": {
+      "os_image_uuid": {
+        "source": "policy/transform/os-image-injection",
+        "immutable": true,
+        "injected_at": 1743412800000
+      }
+    }
+  }
+
+If consumer tries to override os_image_uuid: Policy Engine rejects with:
+  { "code": "FIELD_IMMUTABLE",
+    "field": "fields.os_image_uuid",
+    "set_by": "policy/transform/os-image-injection" }
+```
+
+---
+
+## 7.2 Placement Policy — Provider Selection with Constraints
+
+Placement policies express where a resource should be dispatched. DCM's
+Placement Engine evaluates all registered providers against placement policies
+plus the Scoring Model.
+
+**Use case:** For a PHI-classified VM, require a provider with HIPAA BAA
+accreditation, in Zone A or Zone B, with at least 30% capacity remaining.
+
+```rego
+package dcm.policy.placement.phi_vm
+
+import future.keywords.if
+
+placement if {
+    input.payload.resource_type == "Compute.VirtualMachine"
+    input.payload.data_classification == "phi"
+}
+
+output := {
+    "output_type": "placement",
+    "require": {
+        "accreditations": ["hipaa_baa"],          # provider must hold active BAA
+        "sovereignty_zones": ["US-EAST", "US-WEST"], # data must stay in US
+        "availability_zones": ["zone-a", "zone-b"],
+        "minimum_capacity_pct": 30
+    },
+    "prefer": {
+        "accreditations": ["fedramp_moderate"],   # prefer FedRAMP if available
+        "availability_zones": ["zone-a"]          # prefer zone-a (lower latency)
+    },
+    "exclude": {
+        "provider_uuids": []                      # no explicit exclusions
+    }
+}
+```
+
+**Placement Engine evaluation:**
+
+```
+Candidate providers for Compute.VirtualMachine:
+  Provider A: hipaa_baa=✅  zone-a=✅  capacity=45%  fedramp=❌
+  Provider B: hipaa_baa=✅  zone-b=✅  capacity=72%  fedramp=✅
+  Provider C: hipaa_baa=❌  zone-a=✅  capacity=88%
+
+Filtering (require):
+  Provider C: eliminated (no hipaa_baa)
+
+Scoring (prefer + Scoring Model):
+  Provider B: higher score (fedramp preferred, higher capacity)
+  Provider A: lower score (no fedramp)
+
+Selected: Provider B
+  dispatch: CreateRequest → Provider B
+  placement_audit:
+    policy: placement/phi-vm
+    evaluated: [provider-a, provider-b, provider-c]
+    eliminated: [provider-c (missing: hipaa_baa)]
+    selected: provider-b
+    selection_reason: "highest scoring after require filter"
+```
+
+---
+
+## 7.3 Shadow Execution — Safe Policy Rollout
+
+Shadow execution lets a new policy run against real traffic without affecting
+outcomes. Divergences are surfaced for review before the policy goes active.
+
+**Use case:** Testing a new cost-cap gatekeeper before enforcement.
+
+```yaml
+# GitOps PR: policies/cost-cap-v1.yaml
+policy:
+  handle: "tenant/acme/cost-cap-1000"
+  version: "1.0.0"
+  status: proposed               # shadow mode — evaluates but does not enforce
+  type: gatekeeper
+  rules:
+    - condition: "cost_estimate.monthly_usd > 1000 AND tenant.uuid == 'acme-uuid'"
+      action: gate
+      message: "Estimated monthly cost exceeds $1,000 limit for this tenant"
+  shadow_target: "tenant/acme/cost-cap-500"   # compare against existing policy
+```
+
+**Shadow evaluation in practice:**
+
+```
+Request: VM with estimated cost $800/month (tenant: acme)
+
+existing policy (cost-cap-500, active):  GATE — $800 > $500 limit → request blocked
+new policy    (cost-cap-1000, shadow):   PASS — $800 < $1,000 limit
+
+Divergence detected:
+  policy.shadow_divergence event:
+    shadow_policy: cost-cap-1000
+    active_policy: cost-cap-500
+    divergence_type: active_gated_shadow_passed
+    request_uuid: req-abc123
+    estimated_cost: 800.00
+
+After 7 days of shadow evaluation:
+  Report: 234 requests evaluated
+    Converged (both gate):    89 (38%)
+    Converged (both pass):   118 (50%)
+    Diverged (active gates, shadow passes):  27 (12%)
+       ← these are requests that would be UNBLOCKED by the new policy
+
+Platform Admin reviews divergence report:
+  Decision: the 27 unblocked requests are legitimate — activate cost-cap-1000
+  PATCH /api/v1/admin/policies/{shadow-uuid} → { "status": "active" }
+  PATCH /api/v1/admin/policies/{old-uuid}    → { "status": "deprecated" }
+```
+
+---
+
+# Section 8 — Lifecycle and Model Examples
+
+## 8.1 Scheduled Request — Deferred Provisioning with Maintenance Window
+
+A new database VM is required, but the network team's policy requires all new
+network allocations to happen inside an approved maintenance window.
+
+```
+Consumer: POST /api/v1/requests
+  {
+    "catalog_item_uuid": "<database-vm-catalog-item>",
+    "fields": {
+      "db_engine": "postgresql",
+      "storage_gb": 500,
+      "environment": "prod"
+    },
+    "scheduled_at": null,           # not setting explicit time
+    "schedule": {
+      "dispatch": "window",
+      "window_id": "mw-network-weekly-saturday",   # declared maintenance window
+      "not_after": "2026-05-01T00:00:00Z"          # cancel if no window before May
+    }
+  }
+
+Response 200 — returns Operation:
+  {
+    "name": "/api/v1/operations/req-abc123",
+    "done": false,
+    "metadata": {
+      "stage": "SCHEDULED",
+      "resource_uuid": null,
+      "request_uuid": "req-abc123",
+      "scheduled_dispatch": "window",
+      "window_id": "mw-network-weekly-saturday",
+      "next_window_opens": "2026-04-05T02:00:00Z"
+    }
+  }
+
+At 2026-04-05T02:00:00Z (maintenance window opens):
+  DCM dispatches request to Database Service Provider
+  Stage advances: SCHEDULED → DISPATCHED → PROVISIONING → OPERATIONAL
+
+If window is missed and 2026-05-01 arrives without dispatch:
+  Request → CANCELLED
+  reason: "Scheduled dispatch deadline exceeded"
+  consumer notified via webhook
+```
+
+---
+
+## 8.2 Request Dependency Graph — Three-Tier App with Field Injection
+
+A consumer submits a three-tier application as a coordinated dependency group.
+DCM dispatches each tier in order, injecting realized values between tiers.
+
+```
+Consumer: POST /api/v1/request-groups
+  {
+    "group_handle": "payments-v2-deploy",
+    "requests": [
+      {
+        "request_uuid": "req-db-001",         # created beforehand or inline
+        "depends_on": [],
+        "catalog_item_uuid": "<postgresql-vm>",
+        "fields": { "storage_gb": 500, "environment": "prod" }
+      },
+      {
+        "request_uuid": "req-app-001",
+        "depends_on": [
+          {
+            "request_uuid": "req-db-001",
+            "wait_for": "realized",
+            "inject_fields": [
+              {
+                "from_field": "realized_fields.primary_ip",
+                "to_field": "fields.db_host"
+              },
+              {
+                "from_field": "realized_fields.db_port",
+                "to_field": "fields.db_port"
+              }
+            ]
+          }
+        ],
+        "catalog_item_uuid": "<app-vm>",
+        "fields": { "app": "payments-api", "environment": "prod" }
+      },
+      {
+        "request_uuid": "req-lb-001",
+        "depends_on": [
+          {
+            "request_uuid": "req-app-001",
+            "wait_for": "realized",
+            "inject_fields": [
+              {
+                "from_field": "realized_fields.primary_ip",
+                "to_field": "fields.backend_pool[0]"
+              }
+            ]
+          }
+        ],
+        "catalog_item_uuid": "<load-balancer>",
+        "fields": { "protocol": "HTTPS", "port": 443 }
+      }
+    ]
+  }
+
+Execution sequence:
+  T+0s:   req-db-001 dispatched (no dependencies)
+  T+45s:  req-db-001 REALIZED → db.primary_ip=10.0.1.5
+  T+45s:  req-app-001 dispatched (dependency met; db_host=10.0.1.5 injected)
+  T+90s:  req-app-001 REALIZED → app.primary_ip=10.0.1.10
+  T+90s:  req-lb-001 dispatched (dependency met; backend_pool[0]=10.0.1.10 injected)
+  T+105s: req-lb-001 REALIZED → lb.vip=203.0.113.42
+
+GET /api/v1/request-groups/payments-v2-deploy:
+  {
+    "group_status": "completed",
+    "requests": [
+      { "request_uuid": "req-db-001",  "status": "REALIZED", "entity_uuid": "vm-db-..." },
+      { "request_uuid": "req-app-001", "status": "REALIZED", "entity_uuid": "vm-app-..." },
+      { "request_uuid": "req-lb-001",  "status": "REALIZED", "entity_uuid": "lb-..." }
+    ]
+  }
+```
+
+---
+
+## 8.3 Authority Tier Routing — Tiered Approval for High-Impact Change
+
+DCM routes approval requests based on the authority tier required by matching
+policies. This example shows a sovereign-profile decommission routed through
+two sequential approval tiers.
+
+**Authority tier definition (organization-configured):**
+
+```yaml
+authority_tiers:
+  - name: operator
+    weight: 10
+    description: "Day-to-day platform operator"
+  - name: team_lead
+    weight: 30
+    description: "Technical team lead or senior engineer"
+  - name: platform_admin
+    weight: 60
+    description: "Platform administration team"
+  - name: ciso_office
+    weight: 100
+    description: "CISO office — for high-impact or compliance-relevant changes"
+```
+
+**GateKeeper policy requiring CISO approval:**
+
+```rego
+package dcm.policy.gate.sovereign_decommission
+
+gate if {
+    input.payload.lifecycle_action == "decommission"
+    input.payload.data_classification == "restricted"
+    input.profile == "sovereign"
+}
+
+output := {
+    "output_type": "gatekeeper",
+    "action": "require_approval",
+    "approval_tiers": ["platform_admin", "ciso_office"],   # sequential
+    "approval_mode": "sequential",
+    "approval_deadline": "P7D",
+    "gate_message": "Decommission of restricted-classified resource in sovereign profile requires Platform Admin and CISO approval"
+}
+```
+
+**Approval flow:**
+
+```
+Request: Decommission VM (restricted data, sovereign profile)
+
+GateKeeper fires:
+  Request → AWAITING_APPROVAL (tier: platform_admin)
+  Notification → Platform Admin audience (urgency: high)
+
+Platform Admin approves:
+  POST /api/v1/approvals/{approval-uuid}/approve
+  Request → AWAITING_APPROVAL (tier: ciso_office)
+  Notification → CISO audience (urgency: high)
+
+CISO approves:
+  POST /api/v1/approvals/{approval-uuid}/approve
+  Request → DISPATCHED → DECOMMISSIONED
+
+Audit trail:
+  gate_evaluation: platform_admin approved by actor-123 at T+2h
+  gate_evaluation: ciso_office approved by actor-456 at T+18h
+  total_gate_duration: 20 hours
+```
+
+---
+
+## 8.4 Rehydration (Intent Mode) — DR Failover to New Datacenter
+
+A business unit needs to redeploy their application in DC2 after DC1 becomes
+unavailable. Rehydration replays original intent through current policies —
+applying today's standards to the original request.
+
+**Contrast with Static Replace** (Section 1.9): Static Replace re-executes the
+Requested State verbatim. Rehydration (intent mode) re-runs the full pipeline
+from Intent State — layer assembly, policy evaluation, and placement selection
+all run fresh.
+
+```
+Consumer: POST /api/v1/resources/{entity_uuid}:rehydrate
+  {
+    "mode": "intent",
+    "reason": "DR failover — DC1 unavailable, deploying to DC2",
+    "placement_constraints": {
+      "require_zones": ["DC2-ZONE-A", "DC2-ZONE-B"],
+      "exclude_zones": ["DC1"]
+    },
+    "reuse_intent_version": null    # null = use original intent as-is
+  }
+
+DCM pipeline:
+  1. Retrieve Intent State for entity_uuid
+     (the consumer's original request, before any policy processing)
+
+  2. Layer assembly runs fresh against current layers
+     (DC2 data center layer, current security baseline, current network config)
+
+  3. Policy evaluation runs fresh
+     (current GateKeeper, Validation, Transformation, Placement policies)
+     Note: Placement constraint: exclude DC1, require DC2
+
+  4. Placement Engine selects DC2 provider
+     (new provider_uuid in the dispatch payload)
+
+  5. Dispatch → DC2 Service Provider
+     New entity realized in DC2
+
+  6. Original entity (DC1): status → INDETERMINATE_REALIZATION
+     (DC1 resources may still exist — drift reconciliation queued)
+
+  7. New entity (DC2): OPERATIONAL
+     entity_uuid: new (original entity retired)
+     intent_state links to original intent_uuid (provenance preserved)
+
+Result:
+  - New VM in DC2 with DC2 network addressing, current OS image, current policies
+  - Full provenance chain: original intent → DC1 realization → DC2 rehydration
+  - Audit record: rehydration_reason, original_entity_uuid, new_entity_uuid
+```
+
+---
+
+## 8.5 Session Revocation — Security Incident Response
+
+A security team detects that an actor's credentials may have been compromised.
+Emergency revocation immediately invalidates all active sessions.
+
+```
+Security Team: POST /api/v1/admin/actors/{actor_uuid}/sessions:revoke-all
+  {
+    "reason": "Suspected credential compromise — security incident INC-2026-042",
+    "revocation_scope": "all_sessions",
+    "urgency": "emergency"
+  }
+
+DCM processes:
+  1. All active sessions for actor_uuid → status: revoked
+     Sessions affected: 3 (web console, API client, CLI)
+     revoked_at: 2026-03-31T16:42:00Z
+     revocation_trigger: security_incident
+     revoked_by: actor-security-team
+
+  2. Session UUIDs added to Session Revocation Registry
+     (fast cache — all API components check this on every request)
+
+  3. Next API request from compromised actor:
+     GET /api/v1/resources (any request)
+     → 401 Unauthorized
+     { "code": "SESSION_REVOKED",
+       "message": "Session has been revoked. Please re-authenticate.",
+       "revoked_at": "2026-03-31T16:42:00Z" }
+
+  4. Events fired:
+     auth.session_revoked × 3 (one per session)
+     auth.emergency_revocation (urgency: critical)
+     → Security Team notified
+     → Audit records written (non-suppressable)
+
+  5. In-flight requests (if any):
+     Requests already dispatched to providers: allowed to complete
+     (provider callbacks authenticated separately via provider callback credential)
+     New requests from this actor: blocked immediately
+
+  6. Actor status → suspended (pending security review)
+     actor.suspended event → Platform Admin
+
+Recovery:
+  After investigation: actor cleared
+  POST /api/v1/admin/actors/{uuid}:unsuspend
+  Actor re-authenticates via Auth Provider → new session issued
+```
+
+---
+
+## 8.6 Workload Analysis — Brownfield VM Classification
+
+A platform admin runs brownfield ingestion on a newly discovered VM. The
+Workload Analysis pipeline classifies it and populates the WorkloadProfile.
+
+```
+Discovery Scheduler finds: vm-legacy-0007
+  provider_entity_id: vm-legacy-0007
+  no matching DCM entity in Realized State
+
+Ingestion record created (status: INGESTED):
+  entity_uuid: vm-new-abc123
+  tenant_uuid: __transitional__
+  resource_type: Compute.VirtualMachine (inferred from provider)
+
+Workload Analysis triggered (WLA-001):
+  WorkloadProfile entity created: wla-xyz789
+  linked to: vm-new-abc123
+
+Step 2 — Information Providers queried:
+  Port scan:
+    open ports: [443, 8443, 3000]
+  Process list:
+    [nginx, node, pm2, postgres-client]
+  OS metadata:
+    os: RHEL 8.6 / os_eol: 2029-05-31
+    mounts: / (50GB), /data (500GB — separate partition)
+  MTA assessment:
+    containerization_score: 7
+    blockers: []
+    suggested_target: Platform.KubernetesDeployment
+    archetype: web_server
+
+Step 3 — Classification (WLA-001 policy):
+  workload_archetype: web_server (confidence: high)
+  resource_type_match:
+    primary: Compute.VirtualMachine (confidence: high)
+    alternative: Platform.Container (confidence: medium — MTA score 7)
+  lifecycle_recommendation:
+    dcm_lifecycle_model: standard
+    rehydration_eligible: true      ← /data on separate partition
+    notes: "Containerization candidate per MTA score"
+
+WorkloadProfile → OPERATIONAL:
+  GET /api/v1/resources/vm-new-abc123/workload-profile
+  {
+    "workload_archetype": "web_server",
+    "resource_type_match": { "primary": "Compute.VirtualMachine", "confidence": "high" },
+    "migration_readiness": { "containerization_score": 7, "suggested_target": "Platform.KubernetesDeployment" },
+    "lifecycle_recommendation": { "rehydration_eligible": true }
+  }
+
+Ingestion advances:
+  INGESTED → ENRICHING (WorkloadProfile confidence: high → no manual review needed)
+  Tenant auto-assignment: web_server in /data subnet → Tenant: "payments-platform"
+  ENRICHING → PROMOTED → OPERATIONAL
+```
+
+---
+
+## 8.7 Scoring Model — Placement Tie-Breaking
+
+Two providers both satisfy all required placement constraints. The Scoring Model
+determines which is selected.
+
+**Scenario:** Four providers qualify for a FedRAMP High VM request.
+
+```
+Request:
+  resource_type: Compute.VirtualMachine
+  data_classification: restricted
+  required_accreditations: [fedramp_high]
+  tenant: payments-platform
+
+Providers qualifying after placement require-filter:
+  Provider A: fedramp_high=✅  zone=US-EAST-1a  capacity=60%
+  Provider B: fedramp_high=✅  zone=US-EAST-1b  capacity=82%
+  Provider C: fedramp_high=✅  zone=US-EAST-1a  capacity=35%
+  Provider D: fedramp_high=✅  zone=US-EAST-1b  capacity=91%
+
+Scoring Model evaluation:
+
+Signal 1 — Provider Health Score (weight: 0.30)
+  All four: status=healthy, 99.9% uptime
+  Scores: A=0.98, B=0.97, C=0.99, D=0.96
+
+Signal 2 — Capacity Headroom (weight: 0.25)
+  A=0.60, B=0.82, C=0.35, D=0.91
+  (normalized — higher headroom = lower risk)
+
+Signal 3 — Request Risk Score (weight: 0.20)
+  Cost estimate: $180/mo — medium risk
+  All providers: identical input → same score
+
+Signal 4 — Policy Preference Score (weight: 0.15)
+  Placement policy prefers US-EAST-1a:
+  A=1.0 (preferred zone), B=0.7, C=1.0, D=0.7
+
+Signal 5 — Accreditation Richness (weight: 0.10)
+  Provider B: fedramp_high + iso_27001 + soc2_type2 + verified_P1D → multiplier 1.0 → score: 0.82
+  Provider D: fedramp_high + soc2_type2 + verified_P7D → multiplier 0.9 → score: 0.71
+  Provider A: fedramp_high + verified_P1D → score: 0.52
+  Provider C: fedramp_high + stale_verification → multiplier 0.4 → score: 0.25
+
+Aggregate scores (weighted):
+  Provider A: 0.30×0.98 + 0.25×0.60 + 0.20×0.75 + 0.15×1.0 + 0.10×0.52 = 0.792
+  Provider B: 0.30×0.97 + 0.25×0.82 + 0.20×0.75 + 0.15×0.7 + 0.10×0.82 = 0.826
+  Provider C: 0.30×0.99 + 0.25×0.35 + 0.20×0.75 + 0.15×1.0 + 0.10×0.25 = 0.712
+  Provider D: 0.30×0.96 + 0.25×0.91 + 0.20×0.75 + 0.15×0.7 + 0.10×0.71 = 0.822
+
+Selected: Provider B (score: 0.826)
+  Note: Provider C's stale accreditation verification cost it the placement
+        despite having preferred zone.
+
+Placement audit record:
+  evaluated: [A, B, C, D]
+  scores: {A: 0.792, B: 0.826, C: 0.712, D: 0.822}
+  selected: B
+  selection_margin: 0.004 over Provider D
+  key_differentiator: "Signal 5 — Provider B richer accreditation portfolio"
+```
+
+---
+
+## 8.8 Accreditation Monitor — FedRAMP Status Change Detection
+
+The Accreditation Monitor polls the FedRAMP marketplace and detects that a
+provider's authorization has been downgraded mid-cycle.
+
+```
+Accreditation Monitor — daily poll cycle:
+
+  Provider: eu-west-prod-1 (Service Provider)
+  Accreditation: fedramp_high
+  external_registry_id: "FR2024-0042"
+  DCM status: active
+  last_verified_at: 2026-03-30T03:00:00Z
+
+  Query:
+  GET https://marketplace.fedramp.gov/api/products?id=FR2024-0042
+
+  Response:
+  {
+    "id": "FR2024-0042",
+    "status": "In Process",          ← was "Authorized"
+    "impact_level": "Moderate",      ← was "High"
+    "last_updated": "2026-03-31"
+  }
+
+  Mismatch detected:
+    DCM record:   status=authorized, impact_level=high
+    External:     status=in_process, impact_level=moderate
+
+  ACM-002 applies (not immediate revocation — status is not "Revoked"):
+    Accreditation: status → pending_review
+    last_verified_at: 2026-03-31T03:00:00Z
+    last_result: status_changed
+
+  Events fired:
+    accreditation.status_changed (urgency: high)
+      from_status: authorized / fedramp_high
+      to_status: in_process / fedramp_moderate
+      external_source: fedramp_marketplace
+      action_taken: pending_review
+
+  Notifications:
+    → Platform Admin (urgency: high): "FedRAMP authorization changed for eu-west-prod-1"
+    → Compliance Team
+
+  Governance Matrix impact:
+    Any new request placing fedramp_high workloads on eu-west-prod-1:
+    → Check 3 fails (required accreditation pending_review)
+    → New requests: BLOCKED until Platform Admin resolves
+
+  Active resources (already on eu-west-prod-1):
+    No immediate action (ACM-002 — not immediate revocation)
+    Drift reconciliation queued for governance review
+    Provider flagged: ACCREDITATION_PENDING_REVIEW
+
+Platform Admin investigation:
+  Confirms: FedRAMP PMO initiated annual re-authorization (routine, not security event)
+  Decision: retain accreditation — provider continues under monitoring
+
+  POST /api/v1/admin/accreditations/{uuid}:verify
+    { "override_reason": "Confirmed routine re-authorization — PMO contact: john@fedramp.gov" }
+
+  Accreditation: status → active (manual override with audit record)
+  new_requests: unblocked
+```

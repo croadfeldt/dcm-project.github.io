@@ -5046,7 +5046,85 @@ Provisioned Store → Realized State Store; Job Queue → Message Bus; Rules Eng
 **Matrix:** Domain 37, ACM-001 through ACM-007. Total: 37 domains / 287 capabilities.
 
 
-## SECTION 84 — WORKING INSTRUCTIONS FOR AI MODELS
+## SECTION 84 — COMPREHENSIVE USE CASE EXAMPLES (dcm-use-case-examples.md)
+
+New specification: `specifications/dcm-use-case-examples.md` — 1,853 lines, 5 sections.
+
+**Shared context:** All examples use consistent fictitious actors (alice@corp, bob@corp, svc-pipeline@corp), tenants (payments-bu, web-platform-bu, platform-team), and providers (vmware-prod, netbox-prod, vault-prod, freeipa-prod, ceph-prod, rabbitmq-prod, servicenow-prod, webapp-meta) for cross-example coherence.
+
+**Section 1 — Data Model Examples (12 examples):**
+- 1.1 Four States: VM intent → layer assembly → requested state → realized state → discovered state → decommission
+- 1.2 Layer Assembly: 6-layer compose (base/DC/zone/BU/service/request) with full provenance
+- 1.3 Governance Matrix: PHI request denied — four-axis evaluation, HIPAA BAA missing on provider
+- 1.4 Scoring Model: 5-signal risk score (0-100), placement tie-breaking by accreditation richness + verification multiplier
+- 1.5 Authority Tier: 200-VM bulk request → CRITICAL tier → 3-step approval chain
+- 1.6 Entity Relationships: VM+IP+FirewallRule composite, decommission impact analysis
+- 1.7 Universal Groups: tenant boundary, resource group, cross-tenant read authorization
+- 1.8 Scheduled Requests: maintenance window + deferred OS patch via CI/CD
+- 1.9 Request Dependency Graph: DB→App→LB 3-node chain with field injection between nodes
+- 1.10 Workload Analysis: legacy VM discovered → classified (batch_processor, confidence:medium) → MTA score → ingested
+- 1.11 Accreditation Monitor: FedRAMP daily verify + mid-cycle revocation → immediate gap trigger
+- 1.12 Session Revocation: stolen laptop → all sessions revoked → in-flight request aborted safely
+
+**Section 2 — Provider Interaction Examples (6 new examples, 2.5–2.10):**
+- 2.5 Auth Provider (FreeIPA): registration, LDAP auth flow, group mapping → DCM roles
+- 2.6 Storage Provider (Ceph): write-once snapshot registration, Realized State write
+- 2.7 Message Bus Provider (RabbitMQ): topic exchange, routing key pattern, multi-subscriber routing
+- 2.8 Credential Provider (Vault): AppRole registration, ephemeral bind-password fetch, dynamic DB creds, consumer SSH key retrieval with audit
+- 2.9 Meta Provider: compound WebApp (VM+IP+FW+DNS) decomposition, parallel + sequential constituent ordering, field injection
+- 2.10 ITSM Provider (ServiceNow): incident creation on provider health change, field mapping, resolve on recovery
+
+**Section 3 — Registration Flow Examples (3 examples):**
+- 3.1 Information Provider (NetBox): token issuance, mTLS registration, 6-check validation, approval, assembly enrichment
+- 3.2 Auth Provider (Azure AD OIDC): secondary auth source for contractors, precedence ordering, TTL-scoped role mapping
+- 3.3 Meta Provider: constituent validation, circular dependency check, activation
+
+**Section 4 — OPA Policy Integration (2 examples):**
+- 4.1 Shadow mode: 30-day shadow evaluation, divergence reporting, admin review dashboard, promotion to active
+- 4.2 Bundle delivery: sidecar registration, 5-minute pull cycle, hot reload, evaluation call with input/output
+
+**Section 5 — GUI Examples (3 examples):**
+- 5.1 Consumer Portal: login → catalog → cost estimate → submit → progress polling → credential delivery
+- 5.2 Admin GUI Policy Flow: node-by-node pipeline visualization with shadow indicators and red blocking paths
+- 5.3 Admin GUI Drift Dashboard: severity summary, critical drift detail, revert/accept/investigate actions
+
+
+## SECTION 85 — EXAMPLES EXPANSION (dcm-examples.md)
+
+dcm-examples.md expanded from 1,058 lines to 2,189 lines. Now covers all 10 provider types, all 3 remaining policy types, and 8 new lifecycle/model flows. Full section inventory:
+
+**Section 6 — Provider Type Examples (NEW):**
+- 6.1 Storage Provider — state store write/read cycle (provenance emission, replica confirmation)
+- 6.2 Auth Provider — OIDC cutover from GitHub OAuth (shadow evaluation, zero-downtime cutover)
+- 6.3 Credential Provider — SSH key issuance post-VM-realization, 90-day TTL, auto-rotation at P45D
+- 6.4 Meta Provider — three-tier WebApp stack (VM→VM→LB→DNS with field injection between tiers)
+- 6.5 ITSM Provider — ServiceNow Change Request lifecycle (create→approve→implement→close)
+- 6.6 Message Bus Provider — Kafka event bridge (entity lifecycle events, dead letter handling)
+
+**Section 7 — Policy Type Examples (NEW):**
+- 7.1 Transformation Policy — OS image auto-injection (immutable field, provenance annotation)
+- 7.2 Placement Policy — PHI VM with HIPAA BAA requirement (require/prefer/exclude model, audit trail)
+- 7.3 Shadow Execution — cost-cap policy rollout (parallel evaluation, divergence report, safe activation)
+
+**Section 8 — Lifecycle and Model Examples (NEW):**
+- 8.1 Scheduled Request — deferred provisioning via maintenance window (deadline handling, cancellation)
+- 8.2 Request Dependency Graph — three-tier app with realized field injection across tiers
+- 8.3 Authority Tier Routing — sovereign decommission requiring sequential platform_admin + CISO approval
+- 8.4 Rehydration (intent mode) — DR failover to new datacenter (contrast with Static Replace)
+- 8.5 Session Revocation — emergency security incident response (revoke-all, in-flight handling)
+- 8.6 Workload Analysis — brownfield VM classification via MTA (port scan, process list, classification pipeline)
+- 8.7 Scoring Model — placement tie-breaking with 5 signals (accreditation verification multiplier effect)
+- 8.8 Accreditation Monitor — FedRAMP status change detection (mid-cycle downgrade, pending_review flow)
+
+**Previously covered (Sections 1-5, unchanged):**
+Service Provider (dispatch cycle), Information Provider (assembly enrichment), Policy Provider (OPA sidecar),
+Notification Provider (audience graph), Consumer API lifecycle, Admin API flows, Registration onboarding,
+Brownfield ingestion, Static Replace, In-Place Upgrade.
+
+All 10 provider types: ✅ covered. All 7 policy output schemas: ✅ covered. All major model flows: ✅ covered.
+
+
+## SECTION 86 — WORKING INSTRUCTIONS FOR AI MODELS
 
 When working on this project, apply these instructions in addition to the numbered guidance in SECTION 60 (Documentation Structure):
 
