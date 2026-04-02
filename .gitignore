@@ -7,4 +7,5 @@ resources/
 
 # OS files
 .DS_Store
-
+GIT_INSTRUCTIONS.md
+PR_DESCRIPTION.md
