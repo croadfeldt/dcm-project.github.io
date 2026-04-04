@@ -58,7 +58,7 @@ Layers are **passive** — they declare values but do not execute logic. They do
 
 A policy is an **executable rule** that evaluates the assembled payload and takes action. A policy answers the question: **"given this data, is it valid? what should change? should this proceed?"**
 
-Policies **execute** — they run logic (OPA Rego, DCM native rules, Mode 4 black box calls). They can read every layer-provided value, validate correctness, transform fields, inject derived values, and gate requests. Policies come after layers — they operate on the assembled result.
+Policies **execute** — they run logic (OPA Rego, DCM native rules, external evaluation calls). They can read every layer-provided value, validate correctness, transform fields, inject derived values, and gate requests. Policies come after layers — they operate on the assembled result.
 
 **What belongs in a policy:**
 - Validation rules ("this field must be present and within these bounds")

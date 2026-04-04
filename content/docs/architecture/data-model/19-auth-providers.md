@@ -95,7 +95,7 @@ auth_provider_registration:
 
   # Connection credentials
   connection_credentials_ref:
-    credential_provider_uuid: <uuid>
+    service_provider_uuid: <uuid>
     secret_path: "dcm/auth/freeipa/bind-password"
 
   # Health check
@@ -181,7 +181,7 @@ auth_provider:
   config:
     client_id: <github_oauth_app_client_id>
     client_secret_ref:
-      credential_provider: dcm_internal
+      service_provider: dcm_internal
       path: "dcm/auth/github/client-secret"
     role_mapping:
       default_role: consumer
@@ -200,11 +200,11 @@ auth_provider:
     tls:
       mode: ldaps                 # ldaps | starttls
       ca_cert_ref:
-        credential_provider: dcm_internal
+        service_provider: dcm_internal
         path: "dcm/auth/freeipa/ca-cert"
     bind_dn: "uid=dcm-service,cn=users,cn=accounts,dc=corp,dc=example,dc=com"
     bind_password_ref:
-      credential_provider: dcm_internal
+      service_provider: dcm_internal
       path: "dcm/auth/freeipa/bind-password"
 
     user_search:
@@ -225,7 +225,7 @@ auth_provider:
     kerberos:
       enabled: true               # SSO for Linux CLI users
       keytab_ref:
-        credential_provider: dcm_internal
+        service_provider: dcm_internal
         path: "dcm/auth/freeipa/dcm.keytab"
       service_principal: "HTTP/dcm.corp.example.com@CORP.EXAMPLE.COM"
     hbac:
@@ -251,11 +251,11 @@ auth_provider:
     tls:
       mode: ldaps
       ca_cert_ref:
-        credential_provider: dcm_internal
+        service_provider: dcm_internal
         path: "dcm/auth/ad/ca-cert"
     bind_dn: "CN=DCM Service,OU=Service Accounts,DC=corp,DC=example,DC=com"
     bind_password_ref:
-      credential_provider: dcm_internal
+      service_provider: dcm_internal
       path: "dcm/auth/ad/bind-password"
 
     user_search:
@@ -286,7 +286,7 @@ auth_provider:
     issuer: https://accounts.google.com      # or: Okta, Azure AD, Keycloak, Dex
     client_id: dcm-production
     client_secret_ref:
-      credential_provider: dcm_internal
+      service_provider: dcm_internal
       path: "dcm/auth/oidc/client-secret"
     scopes: [openid, profile, email, groups]
     claims_mapping:
@@ -305,7 +305,7 @@ auth_provider:
   provider_type: mtls
   config:
     ca_cert_ref:
-      credential_provider: dcm_internal
+      service_provider: dcm_internal
       path: "dcm/auth/mtls/ca-cert"
     # Client certificate CN → DCM actor mapping
     cn_actor_mapping:
@@ -361,7 +361,7 @@ auth_provider_chain:
 A **Credential Provider** is the seventh DCM provider type — a cross-cutting dependency that any DCM component or provider registration references for secret resolution. DCM never stores credentials directly.
 
 ```yaml
-credential_provider_registration:
+service_provider_registration:
   artifact_metadata:
     uuid: <uuid>
     handle: "providers/credentials/hashicorp-vault-prod"
@@ -396,18 +396,18 @@ credential_provider_registration:
 ```yaml
 # In webhook authentication
 secret_ref:
-  credential_provider_uuid: <uuid>
+  service_provider_uuid: <uuid>
   secret_path: "dcm/webhooks/payments/hmac-secret"
   version: latest
 
 # In Auth Provider connection
 bind_password_ref:
-  credential_provider_uuid: <uuid>
+  service_provider_uuid: <uuid>
   secret_path: "dcm/auth/freeipa/bind-password"
 
 # In Service Provider registration
 credentials_ref:
-  credential_provider_uuid: <uuid>
+  service_provider_uuid: <uuid>
   secret_path: "dcm/providers/kubevirt/service-account"
 ```
 
@@ -577,7 +577,7 @@ scim_provider_config:
   auth:
     mode: bearer_token
     token_ref:
-      credential_provider_uuid: <uuid>
+      service_provider_uuid: <uuid>
       path: "dcm/auth/scim/bearer-token"
 
   provisioned_resources:
@@ -667,7 +667,7 @@ builtin_auth_provider_config:
     encryption_at_rest:
       required_profiles: [fsi, sovereign]
       key_ref:
-        credential_provider_uuid: <uuid>
+        service_provider_uuid: <uuid>
         path: "dcm/auth/builtin/encryption-key"
 ```
 

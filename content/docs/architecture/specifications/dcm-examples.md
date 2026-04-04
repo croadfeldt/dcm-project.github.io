@@ -725,7 +725,7 @@ DCM injects into assembled payload as a data layer:
   business_unit.provenance.origin.source_uuid = "cmdb-provider-uuid"
 ```
 
-## 2.3 Policy Provider Mode 3 — OPA Sidecar Evaluation
+## 2.3 Internal Policy Evaluation — OPA Sidecar
 
 ```
 Assembly reaches Step 5 (pre-placement policy processing):
@@ -1068,8 +1068,8 @@ Storage Provider, followed by the Request Orchestrator reading it back.
 **Provider registration excerpt:**
 
 ```yaml
-storage_provider_registration:
-  provider_type: storage_provider
+(prescribed infrastructure)_registration:
+  provider_type: (prescribed infrastructure)
   display_name: "Primary PostgreSQL State Store"
   endpoint: https://pg-state.internal:5432
   storage_sub_type: relational_state
@@ -1450,8 +1450,8 @@ This example shows DCM publishing entity lifecycle events to an Apache Kafka top
 **Provider registration:**
 
 ```yaml
-message_bus_provider_registration:
-  provider_type: message_bus_provider
+(optional infrastructure)_registration:
+  provider_type: (optional infrastructure)
   display_name: "Kafka Event Bridge — Infrastructure Events"
   endpoint: https://kafka-bridge.internal:9092
   protocol: kafka

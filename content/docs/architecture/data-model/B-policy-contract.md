@@ -33,24 +33,100 @@ Every Policy in DCM — regardless of type — implements a single base contract
 
 ## 2. Base Contract — Match Conditions
 
-All policies declare when they fire using one or both of two match condition models:
+**A policy fires when the data says it should fire.** There is no pre-assignment of policies to resource types, no routing tables, no static configuration. A policy declares its match conditions against data fields. If the data matches, the policy evaluates. Any piece of data in the request can be an inclusion trigger for a policy.
 
-**Model A — Payload type + field conditions** (for pipeline policies: GateKeeper, Validation, Transformation, Recovery, Orchestration Flow):
+### 2.1 Three Match Sources
+
+Policies can match against data from three sources, all available during evaluation:
+
+| Source | What it contains | Examples |
+|--------|-----------------|---------|
+| **Request payload** | Consumer's declared fields + assembled layers + provenance | `resource_type`, `cpu_count`, `network_segment`, `sovereignty_zone`, `environment`, `application_uuid`, custom tags |
+| **Evaluation Context** | Constraints emitted by policies earlier in this evaluation pass | `allowed_zones`, `distribution_requirement`, `cost_ceiling`, `excluded_providers` |
+| **Entity metadata** | Tenant, actor, resource classification, lifecycle state | `tenant_uuid`, `actor.roles`, `data_classification`, `lifecycle_state`, `cost_center` |
+
+All three sources are addressable via dot-notation field paths. A policy matching on `context.constraints.allowed_zones` fires based on what sovereignty already decided. A policy matching on `request.data_classification` fires based on how the data is classified. A policy matching on `metadata.actor.roles` fires based on who is making the request.
+
+### 2.2 Specificity Spectrum
+
+The same match model expresses policies at every level of specificity:
 
 ```yaml
+# Universal — fires on everything (no conditions)
 match:
-  payload_type: request.initiated | request.layers_assembled | ...   # from closed vocabulary
+  conditions: []
+
+# Classification-scoped — fires on any resource handling PHI
+match:
   conditions:
-    - field: <field_path>                # dot-notation path into the payload
-      operator: equals | in | minimum | maximum | contains | matches
-      value: <value>
-    - field: <field_path>
-      operator: not_equals
-      value: <value>
-  condition_logic: all | any             # default: all
+    - field: request.data_classification
+      operator: in
+      value: ["phi", "pci"]
+
+# Resource-type scoped — fires on all VMs
+match:
+  conditions:
+    - field: request.resource_type
+      operator: equals
+      value: "Compute.VirtualMachine"
+
+# Zone + segment scoped — fires on any resource in DMZ in zone A
+match:
+  conditions:
+    - field: request.network_segment
+      operator: equals
+      value: "dmz"
+    - field: request.placement.zone
+      operator: equals
+      value: "zone-a"
+  condition_logic: all
+
+# Fully specific — VMs in DMZ in zone A for one application
+match:
+  conditions:
+    - field: request.resource_type
+      operator: equals
+      value: "Compute.VirtualMachine"
+    - field: request.network_segment
+      operator: equals
+      value: "dmz"
+    - field: request.placement.zone
+      operator: equals
+      value: "zone-a"
+    - field: request.application_uuid
+      operator: equals
+      value: "xxxx-xxxx-xxxx"
+  condition_logic: all
+
+# Context-aware — fires when sovereignty has restricted zones
+match:
+  conditions:
+    - field: context.constraints.zone_restriction
+      operator: exists
+  condition_logic: all
 ```
 
-**Model B — Four-axis boundary conditions** (for boundary policies: Governance Matrix Rules):
+### 2.3 Match Operators
+
+| Operator | Description |
+|----------|------------|
+| `equals` | Exact match |
+| `not_equals` | Negation |
+| `in` | Value is in a list |
+| `not_in` | Value is not in a list |
+| `exists` | Field is present (any value) |
+| `not_exists` | Field is absent |
+| `minimum` | Numeric ≥ threshold |
+| `maximum` | Numeric ≤ threshold |
+| `contains` | String/array contains substring/element |
+| `matches` | Regex match |
+| `starts_with` | Field path prefix match (for hierarchical resource types) |
+
+`condition_logic: all` (default) requires all conditions to match. `condition_logic: any` requires at least one.
+
+### 2.4 Boundary Match Conditions (Governance Matrix)
+
+Governance Matrix Rules use a four-axis boundary model for matching — subject, data, target, and context. These are structurally the same as field conditions but organized by the four axes of the Governance Matrix:
 
 ```yaml
 match:
@@ -62,7 +138,6 @@ match:
     classification: <level>
     resource_type: <fqn>
     field_paths: { mode: allowlist | blocklist, paths: [...] }
-    capability: <capability>
   target:
     type: <target_type>
     sovereignty_zone: { match: <zone_id> }
@@ -73,8 +148,6 @@ match:
     zero_trust_posture: { minimum: <level> }
     federated: true | false
 ```
-
-Policies may declare match conditions using either model. Orchestration Flow policies and Lifecycle Policies may also use relationship event conditions (see Section 9).
 
 ---
 
@@ -175,17 +248,382 @@ All policies follow the five-status lifecycle:
 
 ---
 
-## 7. Base Contract — Evaluation and Audit
+## 7. Evaluation Model
 
-**Evaluation order:** Within a domain level, policies are evaluated in declared priority order. Across domain levels, more-specific domains evaluate after (and can override) less-specific domains.
+### 7.1 Evaluation Context
 
-**Parallel evaluation:** Policies with no data dependencies on each other evaluate concurrently. The Policy Engine tracks dependency declarations.
+Every request evaluation creates a transient **Evaluation Context** — a shared constraint space that policies read from and write to during evaluation. The context accumulates constraints, hints, and resolutions across evaluation passes.
 
-**Audit:** Every policy evaluation produces an audit record regardless of outcome. The record includes: policy_uuid, policy_version, match_result, output, enforcement_level, actor, timestamp. No evaluation is silent.
+```yaml
+evaluation_context:
+  request_uuid: <uuid>
+  pass_number: 1
+  max_passes: 3                         # configurable; default 3
+
+  # Constraints accumulate — each has provenance
+  constraints:
+    - constraint_uuid: <uuid>
+      source_policy: "<handle>"
+      source_domain: system | platform | tenant | resource_type | entity
+      constraint_type: <string>         # zone_restriction, distribution_requirement, cost_ceiling, etc.
+      field: "<dot-notation path>"
+      operator: restrict_to | require | prefer | exclude
+      value: <any>
+      binding: hard | soft              # hard = cannot be overridden; soft = preference
+      reason: "<human-readable>"
+      pass_added: <int>
+
+  # Hints flow between policies — transient, never persisted as entity data
+  hints:
+    - from_policy: "<handle>"
+      to_concern: "<concern_type>"      # placement, security, compliance, etc.
+      hint_type: <string>
+      value: <any>
+      pass_added: <int>
+
+  # Resolutions record how conflicts were handled
+  resolutions:
+    - conflict: "<description>"
+      strategy: <string>                # from on_conflict declaration
+      result: "<description>"
+      resolved_by: auto | human | escalation
+      pass_resolved: <int>
+
+  # Resolved constraint set — what downstream policies and placement use
+  resolved_constraints: { ... }
+```
+
+The Evaluation Context is **transient** — it exists only during request evaluation. Hints are ephemeral. But the complete context snapshot at each pass is captured in the audit record.
+
+### 7.2 Three-Phase Evaluation
+
+Each pass through the policy engine follows three phases:
+
+**Phase 1 — Constraint Collection.** All policies whose match conditions are satisfied evaluate and emit constraints into the Evaluation Context. Sovereignty writes `allowed_zones`. Tier policy writes `min_replicas` and `min_zones`. Cost policy writes `preferred_zones`. No final decisions — only constraint declarations.
+
+**Phase 2 — Constraint Resolution.** The Policy Engine examines collected constraints for conflicts. When constraints conflict, it checks if the conflicting policies declare resolution strategies via `on_conflict`. Auto-resolvable conflicts are resolved and recorded. Unresolvable conflicts are escalated (request paused for human decision).
+
+**Phase 3 — Application and Validation.** Transformations apply using the resolved constraint set. Placement uses the constrained parameters. GateKeepers re-validate the final assembled payload against the full constraint set. If validation fails, the failure is added as a new constraint and the system loops to the next pass.
+
+```
+Pass 1:
+  Phase 1: Collect constraints
+    → sovereignty: allowed_zones = [A, B]
+    → tier: min_replicas = 6, min_zones = 2, distribution = balanced
+  Phase 2: Resolve conflicts
+    → tier wants 3 zones, sovereignty allows 2
+    → tier declares on_conflict.zone_shortage: redistribute
+    → auto-resolve: 3/3 across zones A and B
+  Phase 3: Apply and validate
+    → transformations inject config
+    → placement distributes 3/3
+    → GateKeepers re-validate → PASS
+  → Converged.
+
+Pass 1 (loop scenario):
+  Phase 3: Validate FAILS → cost optimization placed all 6 in zone A
+    but tier requires balanced distribution
+  Pass 2:
+    New constraint: "zone-a max 4 replicas" (from tier validation failure)
+    Re-resolve → 3/3
+    Re-validate → PASS
+  → Converged on pass 2.
+
+Pass 1 (escalation scenario):
+  Phase 2: sovereignty allows 1 zone, tier requires 2+ zones
+    No auto-resolution → both are hard constraints
+  → Request paused. Escalation with conflict report.
+```
+
+Maximum passes is configurable (default 3). If the evaluation does not converge, the request fails with a full conflict report showing every constraint, every conflict, and every attempted resolution.
+
+### 7.3 Constraint Emission
+
+Policies declare what constraints they emit via `emits_constraints` in their artifact:
+
+```yaml
+policy_artifact:
+  handle: "sovereignty/eu-data-residency"
+  policy_type: gatekeeper
+  match:
+    conditions:
+      - field: request.data_classification
+        operator: in
+        value: ["restricted", "phi", "pci"]
+
+  # What this policy contributes to the evaluation context
+  emits_constraints:
+    - field: "placement.allowed_zones"
+      constraint_type: zone_restriction
+      binding: hard
+    - field: "placement.excluded_providers"
+      constraint_type: provider_exclusion
+      binding: hard
+
+  # How to handle conflicts with this policy's constraints
+  on_conflict:
+    default: deny                       # hard sovereignty — no auto-resolution
+```
+
+```yaml
+policy_artifact:
+  handle: "tier/tier-1-ha-distribution"
+  policy_type: transformation
+  match:
+    conditions:
+      - field: request.tier
+        operator: equals
+        value: "tier-1"
+
+  emits_constraints:
+    - field: "placement.zone_distribution"
+      constraint_type: distribution_requirement
+      binding: hard
+
+  on_conflict:
+    zone_shortage: redistribute         # auto-resolve: spread across available zones
+    replica_shortage: deny              # can't reduce replicas — deny
+    default: escalate
+```
+
+### 7.4 Evaluation Order
+
+Within a single pass:
+
+1. **Domain precedence** — system evaluates first, then platform, then tenant, then resource_type, then entity. More-specific domains evaluate after (and can override) less-specific.
+2. **Within a domain level** — policies evaluate in declared priority order.
+3. **Parallel evaluation** — policies with no data dependencies on each other evaluate concurrently within the same domain level and phase.
+4. **Context-dependent policies** — policies matching on `context.constraints.*` evaluate after the policies that emit those constraints.
+5. **DENY wins** — at the same domain level, any DENY blocks regardless of other policies at that level.
+
+### 7.5 Per-Pass Audit
+
+Every evaluation pass produces an audit record. The record captures the complete state — not just the outcome:
+
+```yaml
+policy_evaluation_audit:
+  request_uuid: <uuid>
+  pass_number: <int>
+  evaluation_context_snapshot: { ... }    # full context at this pass
+  policies_evaluated:
+    - policy_uuid: <uuid>
+      policy_version: "<semver>"
+      matched: true | false
+      output: { ... }
+      constraints_emitted: [...]
+      hints_emitted: [...]
+      duration_ms: <int>
+  conflicts_detected: [...]
+  resolutions_applied: [...]
+  pass_result: converged | loop | escalated | failed
+  total_duration_ms: <int>
+```
+
+Every pass, every constraint, every hint, every resolution — fully auditable. If an auditor asks "why 3/3 instead of 2/2/2?" the trail shows: sovereignty restricted zones, tier auto-resolved via redistribute, placement honored resolved constraints.
 
 ---
 
-## 8. Output Schema — GateKeeper
+## 8. Constraint Type Registry
+
+Constraint types are the shared vocabulary of the Evaluation Context. Every constraint emitted by a policy and every context field matched by a policy must reference a registered constraint type. Freeform strings are not permitted — if two policies should interact, they must agree on the vocabulary, and the registry enforces that agreement.
+
+### 8.1 Registry Entry
+
+```yaml
+constraint_type:
+  handle: "zone_restriction"
+  version: "1.0.0"
+  tier: core                              # core (DCM built-in) | organization (custom)
+  schema:                                 # OpenAPI v3 schema for the constraint value
+    type: object
+    properties:
+      allowed:
+        type: array
+        items: { type: string }
+        description: "Zones where placement is permitted"
+      excluded:
+        type: array
+        items: { type: string }
+        description: "Zones where placement is prohibited"
+    additionalProperties: false
+  semantic: "Restricts which zones a resource may be placed in"
+  binding_levels: [hard, soft]
+  emittable_by: [gatekeeper, validation, governance_matrix_rule]
+  consumable_by: [transformation, gatekeeper, validation]
+```
+
+### 8.2 Built-In Constraint Types (Core Tier)
+
+| Constraint Type | Schema (key fields) | Emitted by | Consumed by |
+|----------------|---------------------|------------|-------------|
+| `zone_restriction` | `{allowed: [string], excluded: [string]}` | Sovereignty, compliance | Placement, distribution |
+| `provider_restriction` | `{allowed: [uuid], excluded: [uuid]}` | Sovereignty, accreditation | Placement |
+| `distribution_requirement` | `{min_replicas: int, min_zones: int, distribution: enum}` | Tier/HA policies | Placement |
+| `cost_ceiling` | `{max_per_unit_hour: decimal, currency: string}` | Budget policies | Placement, approval |
+| `network_restriction` | `{allowed_segments: [string], excluded: [string]}` | Security, compliance | Transformation, placement |
+| `resource_limits` | `{max_cpu: int, max_memory_gb: int, max_storage_gb: int}` | Tier policies, quotas | Validation |
+| `compliance_requirement` | `{frameworks: [string], controls: [string]}` | Compliance profiles | Validation, transformation |
+| `sovereignty_boundary` | `{data_residency: string, jurisdictions: [string]}` | Sovereignty | All downstream |
+| `approval_requirement` | `{required: bool, approvers: [string], quorum: int}` | Tier, compliance | Approval flow |
+| `scheduling_constraint` | `{maintenance_window: cron, blackout_periods: [range]}` | Operational | Placement, lifecycle |
+
+Organizations can register custom constraint types (same as custom resource types). A financial services org might register `trading_window_restriction` or `pci_scope_boundary`.
+
+### 8.3 Hint Types
+
+Hints are soft, advisory signals — not hard constraints. They follow the same registry pattern:
+
+```yaml
+hint_type:
+  handle: "cost_preference"
+  version: "1.0.0"
+  schema:
+    type: object
+    properties:
+      preferred_zones: { type: array, items: { type: string } }
+      reason: { type: string }
+  semantic: "Advisory preference for lower-cost zones"
+  emittable_by: [transformation, validation]
+  consumable_by: [gatekeeper, transformation]
+```
+
+### 8.4 Validation at Policy Activation
+
+When a policy is promoted from `developing` to `proposed` (shadow mode), the Policy Engine validates:
+
+1. Every `emits_constraints[].constraint_type` is a registered constraint type
+2. The emitted value structure matches the registered schema
+3. The emitting policy's type is in the constraint type's `emittable_by` list
+4. Every `match.conditions[].field` referencing `context.constraints.*` corresponds to a registered constraint type
+5. The consuming policy's type is in the constraint type's `consumable_by` list
+
+If any check fails, the policy cannot be activated. Vocabulary mismatches are caught at authoring time, not when a production request fails silently.
+
+---
+
+## 9. Policy Templates
+
+Policy templates separate reusable Rego logic from instance-specific configuration, following the OPA Gatekeeper ConstraintTemplate pattern. A template defines the logic and declares its parameter schema, emitted constraint types, and consumed constraint types. A policy artifact is an instance of a template with bound parameters and match conditions.
+
+### 9.1 Template Definition
+
+```yaml
+policy_template:
+  handle: "dcm.sovereignty.zone-restriction"
+  version: "1.0.0"
+  tier: core
+
+  # Parameters this template accepts (OpenAPI v3 schema)
+  parameter_schema:
+    type: object
+    required: [classification_levels, allowed_zones]
+    properties:
+      classification_levels:
+        type: array
+        items: { type: string }
+      allowed_zones:
+        type: array
+        items: { type: string }
+
+  # Registered constraint types this template emits
+  emits: [zone_restriction, provider_restriction]
+
+  # Registered constraint types this template reads from context
+  consumes: []
+
+  # Rego logic
+  rego: |
+    package dcm.sovereignty.zone_restriction
+    import data.dcm.constraint_types
+
+    emit_constraint[constraint] {
+      input.request.data_classification == input.parameters.classification_levels[_]
+      constraint := constraint_types.zone_restriction({
+        "allowed": input.parameters.allowed_zones,
+        "excluded": [],
+      })
+    }
+
+    deny[msg] {
+      not input.request.placement.zone == input.parameters.allowed_zones[_]
+      msg := sprintf("Zone %v not in allowed zones %v for %v data",
+        [input.request.placement.zone,
+         input.parameters.allowed_zones,
+         input.request.data_classification])
+    }
+```
+
+### 9.2 Policy Artifact (Template Instance)
+
+```yaml
+policy_artifact:
+  handle: "sovereignty/eu-data-residency"
+  template: "dcm.sovereignty.zone-restriction"
+  version: "1.0.0"
+  domain: system
+  policy_type: gatekeeper
+
+  parameters:
+    classification_levels: [restricted, phi, pci]
+    allowed_zones: [eu-west-1, eu-central-1]
+
+  match:
+    conditions:
+      - field: request.data_classification
+        operator: in
+        value: [restricted, phi, pci]
+
+  enforcement: hard
+  on_conflict:
+    default: deny
+```
+
+### 9.3 DCM Constraint Types Library
+
+DCM provides a Rego library (`data.dcm.constraint_types`) bundled with every OPA instance. It provides constructor functions for every registered constraint type that enforce the schema at compile time:
+
+```rego
+package dcm.constraint_types
+
+zone_restriction(params) = constraint {
+  is_array(params.allowed)
+  constraint := {
+    "constraint_type": "zone_restriction",
+    "value": params,
+  }
+}
+
+distribution_requirement(params) = constraint {
+  is_number(params.min_replicas)
+  is_number(params.min_zones)
+  constraint := {
+    "constraint_type": "distribution_requirement",
+    "value": params,
+  }
+}
+```
+
+This library is auto-generated from the Constraint Type Registry. Policy authors call `constraint_types.zone_restriction(...)` instead of crafting raw constraint objects. Wrong field names or types are caught at bundle compilation — not at runtime.
+
+### 9.4 Template Registration Validation
+
+When a template is registered:
+
+1. Rego compiles without errors
+2. Parameter schema is valid OpenAPI v3
+3. All emitted constraint types are registered in the Constraint Type Registry
+4. All consumed constraint types are registered
+5. Rego uses the `data.dcm.constraint_types` library for emissions (not raw objects)
+
+When a policy artifact is created from a template:
+
+1. Parameters validate against the template's parameter schema
+2. Match conditions reference valid field paths
+3. Emitted/consumed constraint types match the template's declarations
+
+---
+
+## 10. Output Schema — GateKeeper
 
 **Fires on:** Request payload at assembly time.
 **Produces:** An allow or deny decision for the request.
@@ -208,7 +646,7 @@ gatekeeper_output:
 
 ---
 
-## 9. Output Schema — Validation
+## 11. Output Schema — Validation
 
 **Fires on:** Request payload; validates correctness of field values.
 **Produces:** Pass or fail with field-level detail.
@@ -230,7 +668,7 @@ validation_output:
 
 ---
 
-## 10. Output Schema — Transformation
+## 12. Output Schema — Transformation
 
 **Fires on:** Request payload; enriches, modifies, or injects field values.
 **Produces:** A set of field mutations to apply to the payload.
@@ -249,7 +687,7 @@ transformation_output:
 
 ---
 
-## 11. Output Schema — Recovery
+## 13. Output Schema — Recovery
 
 **Fires on:** A failure or ambiguity trigger condition (DISPATCH_TIMEOUT, PARTIAL_REALIZATION, CANCELLATION_FAILED, etc.).
 **Produces:** A recovery action and parameters.
@@ -273,7 +711,7 @@ recovery_output:
 
 ---
 
-## 12. Output Schema — Orchestration Flow
+## 14. Output Schema — Orchestration Flow
 
 **The two-level orchestration model:**
 
@@ -319,7 +757,7 @@ Custom steps extend this vocabulary by publishing new payload types.
 
 ---
 
-## 13. Output Schema — Governance Matrix Rule
+## 15. Output Schema — Governance Matrix Rule
 
 **Fires on:** Any cross-boundary interaction (DCM → Provider, DCM → Peer DCM, Provider → DCM).
 **Produces:** A boundary control decision with optional field permissions.
@@ -344,7 +782,7 @@ governance_matrix_output:
 
 ---
 
-## 14. Output Schema — Lifecycle Policy
+## 16. Output Schema — Lifecycle Policy
 
 **Fires on:** Relationship events (related entity state changes, relationship creation/release).
 **Produces:** A lifecycle action to apply to related entities.
@@ -362,7 +800,7 @@ lifecycle_policy_output:
 
 ---
 
-## 15. Output Schema — ITSM Action
+## 17. Output Schema — ITSM Action
 
 The ITSM Action policy type triggers actions in connected ITSM systems as a side-effect of DCM pipeline events.
 
@@ -391,10 +829,11 @@ itsm_action_output:
 - Multiple ITSM Action policies on the same event fire independently (ITSM-POL-004)
 - Full audit record produced on every evaluation (ITSM-POL-003)
 
-## 16. Policy Composition
+## 18. Policy Composition
 
-Policies compose naturally through the domain precedence model:
+Policies compose through three mechanisms:
 
+**Domain precedence** (Section 4) — more-specific domains override less-specific:
 ```
 System policy (GateKeeper: cpu_count max 64)
   └── Platform policy (GateKeeper: prod VMs require manager approval)
@@ -402,13 +841,15 @@ System policy (GateKeeper: cpu_count max 64)
               └── Resource-type policy (Transformation: inject monitoring)
 ```
 
-For a single request, all active matching policies at all domain levels evaluate. GateKeepers at all levels must allow (any deny blocks). Transformations from all levels are collected and applied. Recovery policies use the most-specific matching policy.
+**Evaluation Context** (Section 7) — policies inform each other through constraints and hints. Sovereignty emits zone restrictions; tier distribution reads them and adjusts. Cost policy emits preferences; placement reads them and factors them in. Conflicts are detected and resolved automatically or escalated.
 
-**Policy Groups** are Data artifacts that group related policies by concern_type. Profiles activate Policy Groups. This is how "apply the HIPAA profile" works — it activates the HIPAA compliance domain's Policy Group, which contains all the GateKeeper, Validation, Transformation, and Governance Matrix policies required for HIPAA compliance.
+**Policy Groups** — Data artifacts that group related policies by concern_type. Profiles activate Policy Groups. "Apply the HIPAA profile" activates the HIPAA compliance domain's Policy Group, which contains all the GateKeeper, Validation, Transformation, and Governance Matrix policies required for HIPAA compliance — as a unit, versioned and reviewable together.
+
+For a single request, all active matching policies at all domain levels evaluate across multiple passes if needed. GateKeepers at all levels must allow (any deny blocks). Transformations from all levels are collected and applied in precedence order. Recovery policies use the most-specific matching policy. Constraints accumulate in the Evaluation Context and are available to all subsequent policies.
 
 ---
 
-## 17. Related Policies
+## 19. Related Policies
 
 | Policy | Rule |
 |--------|------|

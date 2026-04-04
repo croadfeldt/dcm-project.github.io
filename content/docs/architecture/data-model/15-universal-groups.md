@@ -215,8 +215,8 @@ dcm_group:
   enforcement_model: enforced
   # Source — local or Policy Provider
   source:
-    type: <local|policy_provider>
-    provider_uuid: <uuid — if policy_provider>
+    type: <local|external_policy_evaluation>
+    provider_uuid: <uuid — if external_policy_evaluation>
     on_provider_update: <proposed|active>
 ```
 

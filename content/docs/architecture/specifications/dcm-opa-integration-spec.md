@@ -22,9 +22,9 @@
 
 ## Abstract
 
-This specification defines how Open Policy Agent (OPA) integrates with the DCM Policy Engine as the reference implementation for Mode 3 Policy Providers. It defines the DCM payload schema as an OPA input document, the expected decision schema as OPA output, the built-in functions DCM provides to Rego policies, and the test harness contract for validating policies before activation.
+This specification defines how Open Policy Agent (OPA) integrates with the DCM Policy Engine as the reference implementation for OPA-based policy evaluations. It defines the DCM payload schema as an OPA input document, the expected decision schema as OPA output, the built-in functions DCM provides to Rego policies, and the test harness contract for validating policies before activation.
 
-OPA is not required to implement DCM — any Mode 3 Policy Provider can implement DCM's policy contract. However, OPA with Rego is the recommended reference implementation, and this specification enables implementors and integrators to build standards-compliant DCM policy engines.
+OPA is not required to implement DCM — any OPA-based policy evaluation can implement DCM's policy contract. However, OPA with Rego is the recommended reference implementation, and this specification enables implementors and integrators to build standards-compliant DCM policy engines.
 
 ---
 
@@ -43,9 +43,9 @@ DCM policy types:
 
 All five types share the same OPA input schema. The output schema differs per type.
 
-### 1.2 Mode 3 Policy Provider
+### 1.2 OPA-based policy evaluation
 
-A Mode 3 Policy Provider executes OPA Rego bundles. DCM dispatches the policy input document to the OPA instance and receives the decision document. The OPA instance may be:
+A OPA-based policy evaluation executes OPA Rego bundles. DCM dispatches the policy input document to the OPA instance and receives the decision document. The OPA instance may be:
 - Embedded within DCM (the reference implementation)
 - A sidecar OPA instance (co-located with DCM)
 - A remote OPA instance (requires network call; latency considerations apply)

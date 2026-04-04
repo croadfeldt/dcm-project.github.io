@@ -224,7 +224,7 @@ DCM maps profile security postures to NIST Authentication Assurance Levels:
 | FedRAMP | 14-policy-profiles |
 | GDPR | 08-resource-grouping, 22-dcm-federation |
 | ISO 27001 | 14-policy-profiles, 26-accreditation |
-| Kubernetes | 11-kubernetes-compatibility, dcm-operator-sdk-api |
+| Kubernetes | kubernetes-compatibility, dcm-operator-sdk-api |
 | OPA | dcm-opa-integration-spec |
 | Prometheus | 12-audit-provenance, 39-dcm-self-health |
 | OpenTelemetry | 12-audit-provenance |

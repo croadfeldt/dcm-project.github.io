@@ -75,7 +75,7 @@ The Notification Provider is the ninth formal DCM provider type. It handles the 
 ### 3.2 Notification Provider Registration
 
 ```yaml
-notification_provider_registration:
+service_provider_registration:
   artifact_metadata:
     uuid: <uuid>
     handle: "org/notifications/slack-provider"
@@ -122,7 +122,7 @@ notification_provider_registration:
 
 ### 3.3 Multiple Notification Providers
 
-Organizations may register multiple Notification Providers — one for Slack, one for PagerDuty, one for ServiceNow tickets. Notification subscriptions declare which provider to use for delivery. The Notification Router in DCM routes each notification to the correct provider based on the subscription's `notification_provider_uuid`.
+Organizations may register multiple Notification Providers — one for Slack, one for PagerDuty, one for ServiceNow tickets. Notification subscriptions declare which provider to use for delivery. The Notification Router in DCM routes each notification to the correct provider based on the subscription's `service_provider_uuid`.
 
 ---
 
@@ -196,7 +196,7 @@ The notification event taxonomy is a **closed vocabulary** — a finite, version
 |-----------|---------|-----------------|
 | `policy.activated` | Policy moved to active status | Platform Admin, Policy Owner |
 | `policy.deactivated` | Policy deactivated | Platform Admin, Policy Owner |
-| `policy_provider.trust_elevated` | Policy Provider mode level elevated | Platform Admin, Security Team |
+| `external_policy_evaluation.trust_elevated` | Policy Provider mode level elevated | Platform Admin, Security Team |
 | `profile.changed` | Active deployment profile changed | Platform Admin, All Tenant Admins |
 | `catalog_item.deprecated` | Catalog item deprecated | All consumers with active resources of that type |
 
@@ -324,7 +324,7 @@ Configured by Tenant admins for all resources in their Tenant. Establishes the b
 ```yaml
 tenant_notification_defaults:
   tenant_uuid: <uuid>
-  notification_provider_uuid: <slack-provider-uuid>
+  service_provider_uuid: <slack-provider-uuid>
 
   default_channel_config:
     channel_type: slack
@@ -358,7 +358,7 @@ Individual actors subscribe to specific events on specific resources or resource
 actor_notification_subscription:
   subscription_uuid: <uuid>
   actor_uuid: <uuid>
-  notification_provider_uuid: <pagerduty-provider-uuid>
+  service_provider_uuid: <pagerduty-provider-uuid>
 
   channel_config:
     channel_type: pagerduty
@@ -521,7 +521,7 @@ notification_delivery_record:
   delivery_uuid: <uuid>
   notification_uuid: <uuid>
   actor_uuid: <uuid>
-  notification_provider_uuid: <uuid>
+  service_provider_uuid: <uuid>
   channel_type: slack
   status: <dispatched|delivered|failed|dead_lettered>
   dispatched_at: <ISO 8601>
@@ -557,7 +557,7 @@ Provider Update Notifications (doc 06, Section 7a) integrate with the notificati
 
 Outbound webhooks (doc 18) are now **one delivery channel type within the Notification Provider model** rather than a parallel mechanism. A Notification Provider with `channel_type: webhook` delivers notifications to configured HTTP endpoints using the unified notification envelope.
 
-The webhook registration model (doc 18, Section 3.2) is superseded for new implementations by actor-level subscriptions (Section 6.1, Tier 3) with a webhook-type Notification Provider. Existing webhook registrations remain supported via a compatibility layer.
+The webhook registration model (doc 18, Section 3.2) is implemented as actor-level subscriptions (Section 6.1, Tier 3) with a webhook-type Notification Provider. 
 
 ### 10.2 Message Bus as Notification Infrastructure
 

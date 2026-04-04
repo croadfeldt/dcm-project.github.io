@@ -93,11 +93,11 @@ The nine-step assembly has per-step sub-timeouts. These are not independently co
 |------|----------------------------|
 | Layer Resolution | 20% |
 | Layer Merge | 10% |
-| Policy Evaluation (each policy) | 15% total, 5% per Mode 1/2, 30s per Mode 3, PT2M per Mode 4 |
+| Policy Evaluation (each policy) | 15% total, 5% per Mode 1/2, 30s per Internal evaluation, PT2M per external evaluation |
 | Placement Engine Loop | 40% |
 | Requested State Persistence | 10% |
 
-A Mode 4 Policy Provider that takes longer than PT2M per query causes an ASSEMBLY_TIMEOUT regardless of the overall assembly_timeout remaining. This prevents a single slow Policy Provider from consuming the entire assembly budget.
+A external policy evaluation that takes longer than PT2M per query causes an ASSEMBLY_TIMEOUT regardless of the overall assembly_timeout remaining. This prevents a single slow Policy Provider from consuming the entire assembly budget.
 
 ### 2.3 Timeout Audit Records
 

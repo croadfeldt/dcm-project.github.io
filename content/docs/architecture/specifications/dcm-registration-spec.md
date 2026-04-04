@@ -88,15 +88,15 @@ provider_type_registry_entry:
 | 1 | `service_provider` | reviewed | all profiles |
 | 2 | `information_provider` | reviewed | all profiles |
 | 3 | `meta_provider` | verified | standard+ |
-| 4 | `storage_provider` | verified | all profiles |
-| 5 | `message_bus_provider` | reviewed | dev+ (external endpoints: standard+) |
-| 6 | `policy_provider` (Mode 1-2) | reviewed | all profiles |
-| 7 | `policy_provider` (Mode 3-4) | verified | standard+ |
-| 8 | `credential_provider` | verified | standard+ |
+| 4 | `(prescribed infrastructure)` | verified | all profiles |
+| 5 | `(optional infrastructure)` | reviewed | dev+ (external endpoints: standard+) |
+| 6 | `external_policy_evaluation` (Mode 1-2) | reviewed | all profiles |
+| 7 | `external_policy_evaluation` (Internal and External) | verified | standard+ |
+| 8 | `service_provider` | verified | standard+ |
 | 9 | `auth_provider` | verified | all profiles |
-| 10 | `notification_provider` | reviewed | all profiles |
+| 10 | `service_provider` | reviewed | all profiles |
 
-Note: Mode 3-4 Policy Providers are treated as a separate registry entry from Mode 1-2 due to the elevated trust requirements.
+Note: Internal and External Policy Providers are treated as a separate registry entry from Mode 1-2 due to the elevated trust requirements.
 
 ---
 
@@ -494,7 +494,7 @@ information_provider_capabilities:
 ### 5.3 Storage Provider Capabilities
 
 ```yaml
-storage_provider_capabilities:
+(prescribed infrastructure)_capabilities:
   store_types_supported:
     - store_type: gitops
       branch_per_request: true
@@ -529,7 +529,7 @@ storage_provider_capabilities:
 ### 5.4 Policy Provider Capabilities
 
 ```yaml
-policy_provider_capabilities:
+external_policy_evaluation_capabilities:
   mode: 1 | 2 | 3 | 4
   policy_types_supported:
     - gatekeeper
@@ -541,7 +541,7 @@ policy_provider_capabilities:
   framework: opa | cedar | custom
   rego_version: "1.0"                # for OPA providers
 
-  # Mode 3/4 specific
+  # Internal/External specific
   remote_endpoint: https://policy.example.com/evaluate
   endpoint_sovereignty_zone: eu-west-sovereign
   evaluation_latency_p95: PT200MS
@@ -587,7 +587,7 @@ auth_provider_capabilities:
 ### 5.6 Notification Provider Capabilities
 
 ```yaml
-notification_provider_capabilities:
+service_provider_capabilities:
   delivery_channels:
     - channel_type: slack
       supports_threading: true
@@ -618,7 +618,7 @@ notification_provider_capabilities:
 ### 5.7 Credential Provider Capabilities
 
 ```yaml
-credential_provider_capabilities:
+service_provider_capabilities:
   credential_types:
     - api_key
     - x509_certificate
@@ -642,7 +642,7 @@ credential_provider_capabilities:
 ### 5.8 Message Bus Provider Capabilities
 
 ```yaml
-message_bus_provider_capabilities:
+(optional infrastructure)_capabilities:
   protocols: [kafka, amqp, mqtt, grpc]
   persistence: true
   durability: at_least_once | exactly_once

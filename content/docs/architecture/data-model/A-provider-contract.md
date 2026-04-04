@@ -159,17 +159,21 @@ POST {dcm_lifecycle_endpoint}
 
 ---
 
-## 7. Capability Extensions — All Twelve Types
+
+## 7. Capability Extensions — Provider Types
+
+DCM defines six provider types. Each shares the base contract (Section 1–6) and adds a typed capability extension declaring what the provider can do.
 
 ### 7.1 Service Provider
 
-**What it does:** Realizes infrastructure resources. Receives assembled payloads, provisions the resource, returns realized state.
+**What it does:** Realizes infrastructure resources. Receives assembled payloads, provisions the resource, returns realized state. Service providers also cover credential management (Credential.* resource types via Vault or similar), notification delivery (Notification.* resource types), and ITSM integration (ITSM.* resource types) — these are service providers with specific resource type declarations, not separate provider types.
 
 **Additional endpoints:**
 ```
 POST {dispatch_endpoint}         # receive and execute dispatch payload
 POST {cancel_endpoint}           # receive cancellation request (if supported)
 POST {discover_endpoint}         # receive discovery request; return discovered state
+GET  {capabilities_endpoint}     # return available options (networks, images, storage classes)
 ```
 
 **Capability declaration extension:**
@@ -192,7 +196,7 @@ service_provider_capabilities:
     currency: USD
 ```
 
-**Data direction:** DCM sends assembled Requested State → Provider naturalizes → executes → denaturalizes → returns Realized State. DCM writes Realized State to Snapshot Store.
+**Data direction:** DCM sends assembled Requested State → Provider naturalizes → executes → denaturalizes → returns Realized State.
 
 ---
 
@@ -224,38 +228,7 @@ information_provider_capabilities:
 
 ---
 
-### 7.3 Storage Provider
-
-**What it does:** Persists DCM state data. Implements one or more store contracts (GitOps, write-once snapshot, event stream, search index, audit).
-
-**Additional endpoints:**
-```
-POST {write_endpoint}            # receive and persist data
-GET  {read_endpoint}             # return stored data
-POST {query_endpoint}            # execute indexed query (search index sub-type)
-GET  {health_endpoint}           # includes store-specific metrics
-```
-
-**Capability declaration extension:**
-```yaml
-storage_provider_capabilities:
-  store_types:
-    - gitops               # Intent and Requested stores
-    - write_once_snapshot  # Realized store
-    - event_stream         # Discovered store
-    - search_index         # Query projection
-    - audit                # Audit store
-  consistency: strong | eventual | bounded_staleness
-  geo_replicated: true
-  encryption_at_rest: AES-256
-  hsm_backed: false
-```
-
-**Data direction:** Bidirectional. DCM writes state; DCM reads state. Provider never initiates.
-
----
-
-### 7.4 Meta Provider
+### 7.3 Meta Provider
 
 **What it does:** Composes multiple child providers to deliver a compound service as a single catalog item. The Meta Provider declares a compound service definition — constituent resource types, dependencies, and delivery requirements — so DCM can place, sequence, and govern the constituents. For its own resource types (`provided_by: self`), the Meta Provider executes as a standard Service Provider. All orchestration, placement, sequencing, failure handling, and compensation is performed by DCM using the declared dependency graph.
 
@@ -266,17 +239,12 @@ storage_provider_capabilities:
 meta_provider_capabilities:
   constituent_provider_types: [service_provider, information_provider, meta_provider]
   composition_model:
-    execution: dependency_ordered    # sequential | parallel | dependency_ordered
+    execution: dependency_ordered
     max_concurrent_realizations: 10
     max_constituent_count: 20
     max_nesting_depth: 3
   partial_delivery_supported: true
-  compensation_supported: true      # required if partial_delivery_supported: true (MPX-001)
-  compensation_timeout: PT30M
-  idempotency_guaranteed: true
-  status_reporting:
-    supported: true
-    interval: PT30S
+  compensation_supported: true
   resource_types_composed:
     - fqn: ApplicationStack.WebApp
       version: "2.0.0"
@@ -287,92 +255,21 @@ meta_provider_capabilities:
           required_for_delivery: required
         - resource_type: DNS.Record
           required_for_delivery: partial
-      composition_visibility: selective   # opaque | transparent | selective
+      composition_visibility: selective
 ```
 
 **Composite status determination:**
 - `REALIZED` — all required constituents succeeded
-- `DEGRADED` — required constituents succeeded; one or more partial constituents failed (accepted if `partial_delivery_supported: true`)
+- `DEGRADED` — required constituents succeeded; one or more partial constituents failed
 - `FAILED` — one or more required constituents failed → compensation executes
 
 **Data direction:** DCM sends fully assembled compound payload → Meta Provider orchestrates constituents in dependency order → aggregates realized states → returns compound realized state to DCM.
 
 ---
 
-### 7.5 Policy Provider
+### 7.4 Auth Provider
 
-**What it does:** Evaluates policies externally. Receives a DCM payload, evaluates Rego or custom logic, returns a typed policy decision.
-
-**Additional endpoints:**
-```
-POST {evaluate_endpoint}         # receive payload; return policy decision
-POST {test_endpoint}             # receive test case; return evaluation result (shadow mode)
-```
-
-**Capability declaration extension:**
-```yaml
-policy_provider_capabilities:
-  mode: 1 | 2 | 3 | 4
-  policy_types: [gatekeeper, validation, transformation, recovery]
-  framework: opa | cedar | custom
-  shadow_mode_supported: true
-  endpoint_sovereignty_zone: <zone_id>   # required for Mode 4
-```
-
-**Data direction:** DCM sends payload + active policy bundle → Provider evaluates → returns typed decision (allow/deny, mutations, action).
-
----
-
-### 7.6 Credential Provider
-
-**What it does:** Issues, rotates, and revokes credentials used within the DCM ecosystem — both DCM interaction credentials (short-lived, scoped, used for provider dispatch under the Zero Trust model) and consumer-facing resource credentials (SSH keys, API keys, kubeconfigs, service account tokens, database passwords, x509 certificates).
-
-> **Full specification:** See [Credential Provider Model](31-credential-provider-model.md) for the complete issuance contract, rotation protocol, revocation propagation, consumer delivery, and system policies (CPX-001–CPX-008).
-
-**Credential values are never stored in DCM** — only credential metadata (UUID, type, scope, expiry, status) is stored. Values are held by the Credential Provider and retrieved by authorized consumers via a declared `value_retrieval_endpoint`.
-
-**Additional endpoints:**
-```
-POST   {issue_endpoint}              # issue credential; return metadata + retrieval URL
-POST   {rotate_endpoint}             # rotate; return old/new UUIDs + transition window
-DELETE {revoke_endpoint}/{uuid}      # revoke immediately or at transition window end
-POST   {validate_endpoint}           # use-time validity check (scope, revocation, expiry)
-GET    {list_endpoint}               # list credentials by entity_uuid or issued_to
-```
-
-**Capability declaration extension (summary — full schema in doc 31):**
-```yaml
-credential_provider_capabilities:
-  credential_types:
-    - api_key
-    - x509_certificate
-    - ssh_key
-    - service_account_token
-    - database_password
-    - kubeconfig
-    - hsm_backed_key
-    - dcm_interaction          # required if handling DCM interaction credentials
-  hsm_backed: false
-  fips_140_2_level: 0 | 1 | 2 | 3   # enforced per profile (Section 12)
-  dynamic_secrets: true
-  rotation_support: true
-  revocation_sla: PT5M         # profile-governed; PT30S for sovereign
-  approved_algorithms:         # declare which algorithms the provider supports
-    ssh_key: [Ed25519, ECDSA-P-384, RSA-4096]
-    x509_certificate: [Ed25519, ECDSA-P-384, RSA-4096]
-    service_account_token: [RS256, ES256, HS256]
-    # ... per credential type
-  key_escrow:
-    supported: false           # true only for regulated sovereign deployments
-```
-
-**Data direction:** DCM requests credential → Provider issues scoped credential + returns metadata → DCM stores metadata, includes retrieval URL in realized entity → Consumer retrieves value via authenticated endpoint. Revocation: DCM requests revocation → Provider invalidates → DCM publishes revocation event to Message Bus → all components refresh revocation cache within profile-governed TTL.
-
----
-
-### 7.7 Auth Provider
-
-**What it does:** Authenticates actor identities and resolves their roles and group memberships.
+**What it does:** Authenticates actor identities and resolves their roles and group memberships. Multiple auth providers can be registered — tenant routing determines which provider authenticates a given actor.
 
 **Additional endpoints:**
 ```
@@ -391,84 +288,15 @@ auth_provider_capabilities:
   token_lifetime:
     default: PT1H
     max: PT8H
+  federation_capable: true
+  supports_session_revocation: true
 ```
 
 **Data direction:** Consumer sends credentials → Auth Provider validates → returns token + claims → DCM extracts actor identity.
 
 ---
 
-### 7.8 Notification Provider
-
-**What it does:** Receives unified notification envelopes from DCM and delivers them via configured channels.
-
-**Additional endpoints:**
-```
-POST {delivery_endpoint}         # receive notification envelope; deliver to channel
-POST {delivery_status_endpoint}  # callback: report delivery status to DCM
-```
-
-**Capability declaration extension:**
-```yaml
-notification_provider_capabilities:
-  delivery_channels:
-    - channel_type: slack | pagerduty | email | webhook | sms | servicenow
-      supports_urgency_routing: true
-      config_schema_ref: <uuid>
-  delivery_guarantees:
-    at_least_once: true
-    idempotency_key: notification_uuid
-    max_latency_seconds: 30
-  sovereignty_aware_delivery: true
-```
-
-**Data direction:** DCM sends notification envelope → Provider translates to channel format → delivers → reports status.
-
----
-
-### 7.9 Message Bus Provider
-
-**What it does:** Provides persistent, high-throughput asynchronous event streaming between DCM components and external systems.
-
-**Capability declaration extension:**
-```yaml
-message_bus_capabilities:
-  protocols: [kafka, amqp, mqtt]
-  persistence: true
-  durability: at_least_once | exactly_once
-  external_endpoints: false          # true only if messages leave sovereignty boundary
-  topics:
-    - name: dcm.events
-      retention: P7D
-```
-
-**Data direction:** Bidirectional publish/subscribe. DCM publishes events; components and external systems subscribe.
-
----
-
-### 7.10 Registry Provider
-
-**What it does:** Serves the Resource Type Registry — the authoritative catalog of resource types available to DCM deployments.
-
-**Additional endpoints:**
-```
-GET  {registry_endpoint}         # serve registry entries (full or incremental)
-GET  {bundle_endpoint}           # serve signed registry bundle (air-gapped mode)
-```
-
-**Capability declaration extension:**
-```yaml
-registry_provider_capabilities:
-  serves_tiers: [core, verified_community, organization]
-  incremental_sync: true
-  signed_bundles: true           # for air-gapped deployments
-  bundle_signing_key_ref: <uuid>
-```
-
-**Data direction:** DCM pulls registry entries → Provider returns signed bundle or live entries.
-
----
-
-### 7.11 Peer DCM (Federation)
+### 7.5 Peer DCM (Federation)
 
 **What it does:** Another DCM instance participating in federation. Treated as a typed Provider with a federation tunnel as the communication channel.
 
@@ -478,10 +306,10 @@ peer_dcm_capabilities:
   dcm_version: "1.0.0"
   tunnel_type: peer | parent_child | hub_spoke
   deployment_accreditations: [<accreditation_uuids>]
-  inbound_authorization:          # what this peer may request from local DCM
+  inbound_authorization:
     - operation: catalog_query
       resource_types: [Compute.VirtualMachine]
-  outbound_authorization:         # what local DCM may request from this peer
+  outbound_authorization:
     - operation: placement_query
       resource_types: [Compute.VirtualMachine]
   data_boundary:
@@ -490,6 +318,40 @@ peer_dcm_capabilities:
 ```
 
 **Data direction:** Bidirectional within declared authorization scope. Federation tunnel with mTLS, certificate pinning, per-message signing.
+
+---
+
+### 7.6 Process Provider
+
+**What it does:** Executes ephemeral workflows to completion. Unlike service providers that manage persistent resource lifecycle (create → operate → decommission), process providers execute a job and report a result. No persistent resource is created — the entity type is `process_resource` which reaches a terminal state on completion.
+
+**Use cases:** Software installation, backup execution, compliance scan, data migration, certificate rotation, patch application, report generation.
+
+**Additional endpoints:**
+```
+POST {execute_endpoint}          # receive job payload; begin execution
+GET  {status_endpoint}/{job_id}  # poll execution status
+POST {cancel_endpoint}/{job_id}  # cancel running execution (if supported)
+```
+
+**Capability declaration extension:**
+```yaml
+process_provider_capabilities:
+  supported_process_types:
+    - "Process.SoftwareInstall"
+    - "Process.BackupExecution"
+    - "Process.ComplianceScan"
+    - "Process.DataMigration"
+  max_concurrent_executions: 10
+  timeout_default: PT30M
+  idempotent: true
+  cancellation_supported: true
+  automation_platform: aap | tekton | argo_workflows | direct_api
+```
+
+**Data direction:** DCM sends job payload → Process Provider executes → reports progress via status polling or callback → returns result payload on completion. Result payload follows standard denaturalization — provider-native output translated to DCM unified format.
+
+**Lifecycle:** `PENDING → EXECUTING → COMPLETED | FAILED | CANCELLED`. No ongoing lifecycle management — process resources reach a terminal state and stay there.
 
 ---
 
@@ -523,33 +385,3 @@ Profile-governed approval methods override provider type defaults. See [Registra
 ---
 
 *Document maintained by the DCM Project. For questions or contributions see [GitHub](https://github.com/dcm-project).*
-
-## ITSM Provider
-
-**What it does:** Provides bidirectional integration with external ITSM systems. Outbound: receives DCM lifecycle event data and creates/updates records in the ITSM system (change requests, incidents, CMDB CIs). Inbound: routes ITSM approval decisions back to DCM as approval votes, and accepts ITSM-initiated request submissions.
-
-**Additional endpoints (ITSM Provider implements):**
-```
-POST {provider_base}/actions              # receive action request from DCM
-GET  {provider_base}/actions/{action_id}  # DCM checks action completion status
-GET  {provider_base}/records/{record_id}  # DCM retrieves record status from ITSM
-POST {provider_base}/inbound             # ITSM system sends inbound approval/event
-```
-
-**Capability declaration extension:**
-```yaml
-itsm_provider_capabilities:
-  itsm_system: servicenow | jira_service_management | bmc_remedy | bmc_helix |
-               freshservice | zendesk | pagerduty | opsgenie | manageengine |
-               cherwell | topdesk | generic_rest
-  supported_actions: [<action_list>]
-  endpoint_url: <url>
-  auth_credential_uuid: <uuid>
-  inbound_webhook:
-    enabled: <bool>
-    secret_credential_uuid: <uuid>
-  field_mapping_ref: <git-path>
-  cmdb_ci_type_map: [<mapping_list>]
-```
-
-> **See [ITSM Integration](42-itsm-integration.md)** for complete capability declaration schemas, supported systems, and system policies ITSM-001–007.

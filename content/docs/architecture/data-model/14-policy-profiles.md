@@ -385,8 +385,8 @@ policy_group:
 
   # Source — locally authored or from a Policy Provider
   source:
-    type: <local | policy_provider>
-    provider_uuid: <uuid — if policy_provider>
+    type: <local | external>
+    provider_uuid: <uuid — if external>
     provider_group_reference: <provider's identifier for this group>
     on_provider_update: <proposed | active>
     # proposed: provider updates require local review before activation
@@ -744,438 +744,101 @@ When a profile is in `proposed` status, all its constituent policies run in shad
 
 ---
 
-## 4. Policy Providers
+## 4. Policy Evaluation Modes
 
-### 4.1 Policy Provider (one of eleven DCM provider types)
+DCM supports two policy evaluation modes. The distinction is whether DCM or an external system performs the evaluation — not how policies are delivered to the evaluator.
 
-A **Policy Provider** is a fifth DCM provider type — an external authoritative source that supplies policies directly into DCM or evaluates and enriches DCM data through an external logic engine.
+### 4.1 Internal Mode — DCM Evaluates
 
-| Type | Purpose | DCM Owns Result? |
-|------|---------|-----------------|
-| **Service Provider** | Realizes resources | Yes |
-| **Information Provider** | Serves authoritative external data | No |
-| **Meta Provider** | Composes multiple providers | Yes |
-| **Storage Provider** | Persists DCM state | Yes |
-| **Policy Provider** | Supplies policies from external authoritative sources, or evaluates and enriches data via external logic | Policies and enrichment data become DCM-owned on import |
+In Internal mode, the Policy Manager evaluates all policies using its embedded OPA engine. Policies can arrive through any delivery mechanism:
 
-**Why Policy Providers?** Organizations should not need to manually translate regulatory controls, security benchmarks, or vendor-specific policies into DCM format. A Policy Provider is the authoritative source — DCM subscribes to it and receives updates automatically. For Mode 4, the external system is the authoritative logic engine — DCM queries it and acts on the result.
+| Delivery | Description |
+|----------|-------------|
+| **API / GitOps** | Policies stored in DCM's database, managed via API or Git ingress adapter |
+| **OPA Bundle** | Standard OPA bundle protocol — point OPA at a bundle server URL |
+| **External Schema** | Policies in non-Rego format (e.g., XACML, custom JSON) naturalized to Rego by DCM before evaluation |
 
-### 4.2 The Four Policy Provider Delivery Modes
+All three delivery mechanisms result in the same thing: Rego policies evaluated by OPA against the request payload. Where OPA runs (embedded Go library, sidecar container, or remote OPA instance) is a deployment topology decision — not a mode distinction.
 
-| Mode | Name | How it works | Logic lives in |
-|------|------|-------------|---------------|
-| **Mode 1** | DCM Native Push/Pull | Provider delivers DCM-format policy artifacts | DCM Policy Engine |
-| **Mode 2** | OPA/Rego Bundle | Provider delivers OPA Rego bundles | DCM Policy Engine (OPA) |
-| **Mode 3** | External Schema | Provider delivers external-format policies requiring naturalization | DCM Policy Engine (post-translation) |
-| **Mode 4** | Black Box Query-Enrichment | DCM sends a query, provider evaluates and/or enriches, returns structured result | External provider — logic is opaque to DCM |
-
-Modes 1-3 are **policy delivery** modes — the provider sends rules, DCM stores and executes them. Mode 4 is fundamentally different: the policy logic lives in the external system. DCM sends data, receives a result, and acts on it.
-
-### 4.3 Policy Provider Contract — Modes 1-3
-
-Policy Providers in Modes 1-3 follow the same base contract as all providers: registration, health check, trust, and provenance emission.
-
+**Policy registration:**
 ```yaml
-policy_provider_registration:
-  artifact_metadata:
-    uuid: <uuid>
-    handle: "providers/policy/grc-platform-001"
-    version: "1.0.0"
-    status: active
-    owned_by:
-      display_name: "Security Team"
-      notification_endpoint: <endpoint>
-
-  name: "Enterprise GRC Platform"
-  description: "Publishes compliance controls from GRC platform to DCM"
-
+policy:
+  handle: "vm-size-limits"
+  policy_type: gatekeeper
   delivery:
-    mode: <push | pull | webhook>
-    pull_schedule: "0 2 * * *"    # cron — if mode: pull
-    endpoint: <provider API endpoint>
-
-  policy_format: <dcm_native | opa_rego | external_schema>
-
-  managed_domains:
-    concern_types: [compliance, sovereignty]
-    concern_tags: [pci-dss, gdpr, iso-27001]
-
-  trust_level: <trusted | verified | untrusted>
-  max_policy_authority: gatekeeper
-
-  on_update: proposed
-  on_provider_failure:
-    action: <deprecate | retain | alert>
-    sunset_days: 30
+    mode: push                              # or: pull, opa_bundle, external_schema
+    source_url: "https://git.corp/policies" # for pull/bundle modes
+    format: rego                            # or: xacml, custom_json (naturalized to rego)
+  activation: active                        # or: proposed (shadow mode)
+  trust_level: trusted                      # trusted, verified, untrusted
 ```
 
-### 4.4 Policy Naturalization (Mode 3)
+**Trust levels (Internal mode):**
+- `trusted` — GateKeeper authority (can deny requests)
+- `verified` — Transformation and Validation authority only
+- `untrusted` — advisory only (shadow mode enforcement)
 
-When a Policy Provider delivers policies in an external format, DCM applies **Policy Naturalization** — translating external policy schemas into DCM policy format.
+### 4.2 External Mode — External Provider Evaluates
 
-```
-External Policy Format (OSCAL, XACML, CIS JSON, STIG XCCDF)
-  │
-  ▼  Policy Naturalization (translator component)
-  │
-  ▼
-DCM Policy Format (standard DCM policy artifact)
-  │
-  ▼  Trust validation + conflict detection
-  │
-  ▼
-DCM Policy Engine
-```
+In External mode, DCM sends evaluation context to an external endpoint. The external system evaluates and/or enriches the data, and returns a structured result. DCM does not see the policy logic — it trusts the results within scoped bounds.
 
+**External evaluation can:**
+- **Evaluate** — return pass/fail, score, or recommendation
+- **Enrich** — inject additional fields into the payload (risk scores, compliance citations, cost predictions, organizational context)
+- **Both** — combined decision + enrichment in a single response
+
+**Registration:**
 ```yaml
-naturalization:
-  source_schema: oscal           # oscal | xccdf | cis-json | xacml | custom
-  translator_uuid: <uuid>
-  validation_on_import: strict   # strict | lenient
+policy:
+  handle: "compliance-scanner"
+  policy_type: validation
+  delivery:
+    mode: external                          # External mode
+    endpoint: "https://compliance.corp/api/evaluate"
+    auth: mtls
+  data_request_spec:                        # data minimization — only declared fields sent
+    fields: [resource_type, sovereignty_zone, data_classification, tenant_uuid]
+  on_unavailable: gatekeep                  # fail-closed — unknown is not safe
+  trust_level: verified                     # minimum verified for enrichment
 ```
 
-### 4.5 Policy Provider and Policy Groups
+### 4.3 External Mode Governance (BBQ-001 through BBQ-009)
 
-A Modes 1-3 Policy Provider can deliver at three levels of granularity:
+External evaluation introduces governance concerns that Internal mode does not:
 
-- **Individual policies** — administrator manually assigns to groups
-- **Complete Policy Groups** — provider supplies group definitions alongside policies
-- **Complete Policy Profiles** — provider supplies a full deployment profile for one-step activation
+| ID | Requirement |
+|----|-------------|
+| BBQ-001 | Data sovereignty check before any query is sent to an external endpoint |
+| BBQ-002 | Data minimization — only fields declared in `data_request_spec` are sent |
+| BBQ-003 | If the external endpoint is outside the entity's sovereignty zone, the query is blocked unless explicitly authorized |
+| BBQ-004 | Full audit record per query-response cycle, including `audit_token` for cross-system correlation |
+| BBQ-005 | Default failure behavior is `gatekeep` — if the external system is unavailable, the request is denied (fail-closed) |
+| BBQ-006 | Cached results must include the original query timestamp and validity period in provenance |
+| BBQ-007 | Fields injected by external enrichment carry standard field-level provenance: `source_type: external_policy_provider`, `source_uuid`, and `audit_token` |
+| BBQ-008 | The override control model applies to enrichment-injected fields — a GateKeeper policy may restrict or refuse external enrichment on specific fields |
+| BBQ-009 | External enrichment requires minimum `verified` trust level; GateKeeper authority requires `trusted` with dual-approval elevation |
+
+### 4.4 Policy Sources and Policy Groups
+
+Policies from any source (Internal or External) participate in the same Policy Group mechanism. A Policy Group composes multiple policies into a named, versioned, reviewable unit with explicit conflict declarations:
 
 ```yaml
 policy_group:
-  handle: "org/group/grc-pci-dss"
-  source:
-    type: policy_provider
-    provider_uuid: <uuid>
-    provider_group_reference: "pci-dss-v4-full"
-    on_provider_update: proposed
-    last_synced: <ISO 8601>
-    provider_version: "4.0.1"
+  handle: "pci-dss-v4-controls"
+  policies:
+    - ref: "card-data-encryption"           # Internal — Rego policy in DCM
+    - ref: "network-segmentation-check"     # Internal — OPA bundle
+    - ref: "compliance-scanner"             # External — calls external endpoint
+  activation_scope:
+    resource_types: ["*"]
+    tenant_tags: ["pci"]
 ```
 
-### 4.6 Trust Levels and Policy Authority
+### 4.5 Policy Health and Lifecycle
 
-| Trust Level | Max Policy Authority | Requires | Use Case |
-|-------------|---------------------|----------|---------|
-| `trusted` | GateKeeper | Manual elevation + dual approval | Regulatory body, certified compliance package |
-| `verified` | Validation | Registration + health check | Security vendor, GRC platform |
-| `untrusted` | Advisory (logged but not executed) | Registration only | Evaluation, new providers |
-
-Trust elevation requires explicit authorization from both a platform admin and a security owner.
-
-### 4.7 Policy Provider Health and Lifecycle
-
-- **Healthy** — policies current, delivery working normally
-- **Degraded** — delivery delayed or partial — warnings emitted
-- **Unhealthy** — policies move toward `deprecated` per `on_provider_failure` declaration
-- **Deregistered** — policies deprecated with configured sunset
-
----
-
-### 4.8 Mode 4 — Black Box Query-Enrichment
-
-#### 4.8.1 Concept
-
-A **Mode 4 Policy Provider** is an external system that DCM queries during the assembly process to evaluate request data, return a decision, enrich the payload with additional fields, or do both simultaneously.
-
-**The key distinction from Modes 1-3:** The policy logic lives in the external system and is opaque to DCM. DCM does not receive or store the rules — it sends a query and receives a structured result. The external system is the authoritative evaluator and enricher.
-
-**Mode 4 providers can:**
-- **Evaluate** — return a pass/fail, score, or recommendation based on the query
-- **Enrich** — inject additional fields into the payload (risk scores, compliance citations, cost predictions, organizational context, case references)
-- **Do both** — evaluate and enrich in a single atomic query-response cycle
-
-**Examples:**
-- AI/ML risk scoring engine — returns risk score AND injects mitigation recommendations
-- Compliance oracle — returns pass/fail AND injects compliance citations
-- FinOps cost predictor — returns predicted cost AND injects cost allocation metadata
-- Sovereignty verification service — returns jurisdiction compliance AND injects residency certificates
-- Fraud detection system — returns anomaly score AND injects case reference number
-- Identity enrichment service — returns authorization AND injects organizational context (business unit, cost center, project codes)
-- Privileged access management system — returns allow/deny AND injects access justification record
-
-#### 4.8.2 Governance Concerns
-
-Mode 4 introduces governance concerns that Modes 1-3 do not:
-
-**Data sovereignty on outbound data:** DCM is sending request payload data — potentially sensitive — to an external system. Before any data is sent, DCM must verify the provider is authorized to receive the data classifications present in the query. A sovereign deployment must prevent any data from leaving its boundary without explicit authorization.
-
-**Result integrity:** The black box returns a result that DCM acts on. The logic is opaque — DCM cannot inspect it. The provenance chain must record the full query-response cycle: what was sent, what was returned, what action was taken, and the provider's audit token for cross-system correlation.
-
-**Enrichment governance:** Fields injected by a Mode 4 provider carry the same provenance obligations as fields injected by a Transformation Policy. The override control model applies — a GateKeeper can refuse black box enrichment on sovereignty-sensitive fields. Enrichment output may itself carry classification implications and must be governed accordingly.
-
-**Failure behavior:** The black box is external and can be unavailable, slow, or malformed. Failure behavior must be explicitly declared — the default is `gatekeep` (unknown is not safe).
-
-**Non-determinism:** A Mode 4 provider may return different results for the same input at different times (e.g., a risk model updated overnight). Result caching must be declared — and cached results carry a validity period.
-
-#### 4.8.3 Registration — Mode 4 Specific Fields
-
-```yaml
-policy_provider_registration:
-  artifact_metadata:
-    uuid: <uuid>
-    handle: "providers/policy/risk-scoring-engine"
-    version: "1.0.0"
-    status: active
-    owned_by:
-      display_name: "Security Engineering Team"
-      notification_endpoint: <endpoint>
-
-  name: "Enterprise Risk Scoring Engine"
-  description: >
-    ML-based risk scoring and enrichment for infrastructure requests.
-    Returns risk score and injects mitigation recommendations.
-
-  delivery:
-    mode: black_box_query           # Mode 4
-    endpoint: <query API endpoint>
-    query_protocol: <rest | grpc | graphql>
-    timeout_seconds: 30
-    on_timeout: gatekeep            # gatekeep | allow | escalate
-    on_error: gatekeep
-    on_unavailable: gatekeep
-
-  # What data this provider is authorized to receive
-  data_request_spec:
-    fields_requested:
-      - field: resource_type
-        classification_ceiling: unclassified
-      - field: placement.selected_provider_uuid
-        classification_ceiling: internal
-      - field: requester.tenant_uuid
-        classification_ceiling: internal
-      - field: lifecycle_constraints.ttl
-        classification_ceiling: unclassified
-    # Fields NOT declared here are NEVER sent — DCM enforces data minimization
-    # classification_ceiling: maximum classification level this provider may receive
-
-  # Where the provider operates — sovereignty gating
-  operational_sovereignty:
-    jurisdiction: eu-west
-    certifications: [ISO-27001, GDPR-compliant, SOC2-Type2]
-    # DCM checks these against Tenant sovereignty requirements
-    # before authorizing any query
-
-  # Result and enrichment capabilities
-  result_capabilities:
-    result_type: <pass_fail | score | recommendation | enrichment | multi_factor>
-    # pass_fail:    decision only
-    # score:        numeric score with optional threshold
-    # recommendation: structured recommendation
-    # enrichment:   data injection only — no decision
-    # multi_factor: decision + enrichment combined
-
-    # Decision component schema (if applicable)
-    decision_schema:
-      outcome_field: outcome        # field name in response
-      score_field: score            # field name for numeric score
-      confidence_field: confidence
-      citations_field: citations
-      expires_at_field: expires_at
-      audit_token_field: audit_token
-
-    # Enrichment component schema (if applicable)
-    enrichment_schema:
-      fields_injected:
-        - field: risk_score
-          type: float
-          classification: internal
-        - field: risk_citations
-          type: array
-          classification: internal
-        - field: recommended_mitigations
-          type: array
-          classification: internal
-
-  # Result caching
-  result_caching:
-    enabled: true
-    ttl_seconds: 300
-    cache_key_fields: [resource_type, requester.tenant_uuid]
-
-  trust_level: verified
-  max_policy_authority: transformation   # enrichment = transformation authority
-  # A Mode 4 provider that only evaluates can have validation or gatekeeper authority
-  # A Mode 4 provider that enriches requires at minimum transformation authority
-```
-
-#### 4.8.4 Data Sovereignty Governance — Pre-Query Evaluation
-
-Before DCM sends any data to a Mode 4 provider, the Policy Engine evaluates:
-
-```
-Query to Mode 4 provider proposed
-  │
-  ▼
-Data classification check (BBQ-001)
-  │  What classification levels are in the query payload fields?
-  │  Is each field's classification ≤ provider's declared ceiling?
-  │  → Any field exceeds ceiling: strip field or reject query
-  │
-  ▼
-Sovereignty check (BBQ-003)
-  │  Does the provider's operational_sovereignty.jurisdiction
-  │  satisfy the requesting Tenant's sovereignty requirements?
-  │  → Incompatible: block query, apply on_sovereign_mismatch behavior
-  │
-  ▼
-Data minimization (BBQ-002)
-  │  Strip all fields not in provider's data_request_spec
-  │  Apply field-level filtering per cross_tenant_authorization if applicable
-  │
-  ▼
-Authorized → send minimized query
-Unauthorized → apply on_unavailable behavior (typically gatekeep)
-```
-
-#### 4.8.5 Assembly Process Integration
-
-Mode 4 providers participate in any assembly phase — most usefully inside the placement loop where provider-specific data is available:
-
-```yaml
-policy:
-  placement_phase: loop         # pre | loop | post | both
-  evaluation_type: black_box_query
-  black_box_provider_uuid: <uuid>
-
-  # What to send — must be subset of provider's data_request_spec
-  query_fields: [resource_type, placement.selected_provider_uuid, requester.tenant_uuid]
-
-  # How to act on the decision component
-  on_decision:
-    pass: continue
-    fail: <reject_candidate | gatekeep>
-    score_below_threshold:
-      threshold: 0.7
-      action: reject_candidate   # try next provider candidate
-    score_above_threshold:
-      threshold: 0.9
-      action: continue
-
-  # How to act on the enrichment component
-  on_enrichment:
-    inject_fields: true          # inject returned fields into payload
-    override_existing: false     # do not overwrite fields already set
-    # Each injected field carries source_type: black_box_provider + audit_token
-```
-
-#### 4.8.6 Result Schema and Provenance
-
-**Full result structure:**
-
-```yaml
-black_box_result:
-  # Decision component (optional)
-  decision:
-    outcome: <pass | fail | score>
-    score: 0.83
-    confidence: <high | medium | low>
-    citations:
-      - "Provider certification ISO-27001 current as of 2026-01-15"
-      - "No open security incidents in region eu-west-1a"
-    expires_at: <ISO 8601>
-    audit_token: "BB-2026-03-26-00847-A"  # provider's internal reference
-
-  # Enrichment component (optional)
-  enrichment:
-    fields_to_inject:
-      - field: risk_score
-        value: 0.83
-        provenance_note: "Returned by risk scoring engine v2.3"
-      - field: risk_citations
-        value: ["ISO-27001:A.12.1", "No active incidents"]
-        provenance_note: "Risk scoring engine evidence"
-      - field: recommended_mitigations
-        value: ["Enable MFA", "Restrict egress to known endpoints"]
-        provenance_note: "Risk scoring engine recommendations"
-```
-
-**Provenance on injected enrichment fields:**
-
-Each field injected by a Mode 4 provider carries standard field-level provenance:
-
-```yaml
-risk_score:
-  value: 0.83
-  metadata:
-    override: allow              # standard override control applies
-    basis_for_value: "ML risk scoring engine evaluation"
-  provenance:
-    origin:
-      source_type: black_box_provider
-      source_uuid: <provider uuid>
-      timestamp: <ISO 8601>
-      audit_token: "BB-2026-03-26-00847-A"
-      query_uuid: <uuid of this specific query-response cycle>
-```
-
-#### 4.8.7 Audit Record
-
-Every Mode 4 query-response cycle produces a `black_box_evaluation_record` in the Audit Store regardless of outcome:
-
-```yaml
-black_box_evaluation_record:
-  record_uuid: <uuid>
-  policy_uuid: <uuid>
-  request_uuid: <uuid>
-  provider_uuid: <uuid>
-  evaluated_at: <ISO 8601>
-  placement_phase: loop
-
-  query_sent:
-    fields_included: [resource_type, placement.selected_provider_uuid]
-    # Field NAMES only — not raw values. Values stored in provider's system.
-    # Full correlation via audit_token.
-    data_minimization_applied: true
-    sovereignty_check: passed
-    classification_ceiling_honored: true
-
-  result_received:
-    result_type: multi_factor
-    decision:
-      outcome: pass
-      score: 0.83
-      confidence: high
-      expires_at: <ISO 8601>
-      audit_token: "BB-2026-03-26-00847-A"
-    enrichment:
-      fields_injected: [risk_score, risk_citations, recommended_mitigations]
-      override_existing_applied: false
-
-  action_taken: continue_with_enrichment
-  cached_result: false
-  cache_stored: true
-  cache_expires_at: <ISO 8601>
-```
-
-The `audit_token` is the **cross-system audit bridge** — DCM's record references the provider's internal record. Auditors can correlate DCM's audit trail with the black box provider's own logs for full end-to-end traceability.
-
-#### 4.8.8 Failure and Fallback Behavior
-
-| Condition | Default Behavior | Rationale |
-|-----------|-----------------|-----------|
-| `on_timeout` | `gatekeep` | Unknown is not safe |
-| `on_error` | `gatekeep` | Malformed response is not safe |
-| `on_unavailable` | `gatekeep` | External unavailability cannot bypass governance |
-| `on_sovereign_mismatch` | `gatekeep` | Sovereignty cannot be bypassed |
-| `on_classification_exceeded` | strip field or `gatekeep` | Data cannot be sent to unauthorized recipient |
-
-All failure behaviors are configurable. `allow` is available for non-critical enrichment where the enrichment is additive and the request can proceed safely without it. Organizations must explicitly declare `allow` — it is never the default.
-
-#### 4.8.9 System Policies
-
-| Policy | Rule |
-|--------|------|
-| `BBQ-001` | Before sending any data to a Mode 4 provider, the Policy Engine must verify the provider is authorized to receive the data classification levels present in the query |
-| `BBQ-002` | Data sent to a Mode 4 provider must be minimized to only the fields declared in the provider's `data_request_spec` |
-| `BBQ-003` | A Mode 4 provider's `operational_sovereignty` must be compatible with the requesting Tenant's sovereignty requirements before any query is dispatched |
-| `BBQ-004` | All Mode 4 query-response cycles must produce a `black_box_evaluation_record` in the Audit Store |
-| `BBQ-005` | Mode 4 provider failure behavior (`on_timeout`, `on_error`, `on_unavailable`) must be explicitly declared — default is `gatekeep` |
-| `BBQ-006` | Cached Mode 4 results must include the original query timestamp and validity period in provenance |
-| `BBQ-007` | Fields injected into the payload by a Mode 4 provider enrichment must carry standard field-level provenance: `source_type: black_box_provider`, `source_uuid`, and `audit_token` |
-| `BBQ-008` | The override control model applies to fields injected by Mode 4 enrichment — a GateKeeper policy may restrict or refuse black box enrichment on specific fields |
-| `BBQ-009` | A Mode 4 provider that performs enrichment requires at minimum `transformation` trust level authority |
+- **Internal policies:** Health is determined by OPA engine health. If OPA is unavailable, all Internal policies are degraded.
+- **External policies:** Health is determined by endpoint availability. Each external endpoint has a health check (HTTP GET to a declared health URL). Unhealthy external policies trigger their `on_unavailable` behavior (default: `gatekeep`).
+- **Deprecation:** Policies follow the `active → deprecated → retired` lifecycle. Deprecated policies fire with a warning in the audit trail. Retired policies are no longer evaluated.
 
 ---
 
@@ -1468,7 +1131,7 @@ profile_certification:
       expires_at: "2027-11-01"
       certification_scope: "PHI data lifecycle management via DCM"
       certificate_ref:
-        credential_provider_uuid: <uuid>
+        vault_credential_ref: <uuid>
         path: "dcm/registry/certifications/hipaa-prod-2025"
 ```
 
@@ -1479,7 +1142,7 @@ profile_certification:
 Policy Provider trust elevation (increasing the mode level) requires a formal approval workflow. Approval requirements are profile-governed.
 
 ```yaml
-policy_provider_trust_elevation:
+external_evaluation_trust_elevation:
   elevation_request:
     from_mode: 1
     to_mode: 3
@@ -1531,7 +1194,7 @@ layer:
 Policy Provider delivery in air-gapped deployments uses signed bundles — same model as the registry bundle system.
 
 ```yaml
-policy_provider_airgap:
+external_evaluation_airgap:
   delivery_mode: signed_bundle
   bundle_contents:
     - provider_registration_yaml

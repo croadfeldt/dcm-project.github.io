@@ -127,8 +127,8 @@ accreditation:
     owned_by: { display_name: "Compliance Team" }
 
   subject_uuid: <provider-uuid>          # what is being accredited
-  subject_type: service_provider | policy_provider | storage_provider |
-                notification_provider | dcm_deployment
+  subject_type: service_provider | external_policy_evaluation | (prescribed infrastructure) |
+                service_provider | dcm_deployment
 
   accreditation_type: <type from 3.2>
   framework: fedramp_high | fedramp_moderate | hipaa | pci_dss_v4 |
@@ -443,7 +443,7 @@ Interaction attempt
   ▼ Check 5: Sovereignty Check
   │   Is the target endpoint within the sovereignty boundary?
   │   Does the interaction violate any sovereignty constraints?
-  │   BBQ-001 evaluation for Mode 4 endpoints
+  │   BBQ-001 evaluation for external evaluation endpoints
   │   → FAIL: SOVEREIGNTY_VIOLATION; platform admin notified
   │
   ▼ All checks pass → interaction proceeds

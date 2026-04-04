@@ -136,7 +136,7 @@ curl -X POST $DCM_URL/api/v1/resources/$ENTITY_UUID:rehydrate \
 ```
 
 **Talking points:**
-- Intent State is immutable and stored in GitLab — survives the DC loss
+- Intent State is immutable and stored in DCM's database (append-only, never modified) — survives the DC loss
 - Rehydration replays the original intent through *current* policies (not old ones)
 - The Meta Provider handles the sequencing automatically
 - Full audit trail shows before/after states

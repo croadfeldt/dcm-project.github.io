@@ -29,7 +29,7 @@ The DCM Control Plane consists of **nine components** that implement the three f
 > **Internal component authentication:** See [Internal Component Authentication](36-internal-component-auth.md) for the mTLS and interaction credential model governing all component-to-component calls within the DCM control plane.
 
 
-This document formally defines the DCM control plane components that are referenced throughout the data model documents but not previously specified in detail. Two components are defined here:
+This document formally defines the DCM control plane components that are referenced throughout the data model documents. Two components are defined here:
 
 1. **The Request Orchestrator** — the event bus and coordinator of the request lifecycle pipeline
 2. **The Cost Analysis Component** — the internal DCM component that provides cost signals for placement, catalog, and attribution

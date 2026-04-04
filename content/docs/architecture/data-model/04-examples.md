@@ -29,11 +29,13 @@ These examples also resolve outstanding implementation details deferred from oth
 
 ---
 
-## 2. Git Repository Structure
+## 2. Git Repository Structure (Optional Ingress Adapter)
+
+> **Note:** Git is an optional ingress adapter, not a required state store. All four data domains (Intent, Requested, Realized, Discovered) are stored in DCM's PostgreSQL database. These Git layouts apply only when teams choose to use Git/PR-based workflows for submitting intent. See [51-infrastructure-optimization.md](51-infrastructure-optimization.md) for the prescribed infrastructure model.
 
 This resolves the deferred Q54 item from the Four States document (Section 4.1).
 
-The Intent and Requested stores use a handle-based directory structure within Git. Tenant isolation is enforced at the directory level. Provider selection (the Q54 concern) is recorded in the assembled payload, not in the directory structure — so the directory structure is independent of which provider was selected.
+The Intent store uses a handle-based directory structure within Git when Git ingress is enabled. Tenant isolation is enforced at the directory level. Provider selection (the Q54 concern) is recorded in the assembled payload, not in the directory structure — so the directory structure is independent of which provider was selected.
 
 ### 2.1 Intent Store Layout
 
@@ -77,7 +79,7 @@ requested-store/
                 ├── requested.yaml          ← fully assembled payload
                 ├── assembly-provenance.yaml ← complete layer chain and policy evaluation record
                 ├── placement.yaml           ← provider selection and placement constraints
-                └── dependencies.yaml        ← resolved dependency graph
+                └── dependencies.yaml        ← resolved dependency graph (only present when entity has dependencies)
 
 # Example:
 requested-store/
@@ -87,11 +89,12 @@ requested-store/
             └── f5e6d7c8-entity-uuid/
                 ├── requested.yaml
                 ├── assembly-provenance.yaml
-                ├── placement.yaml
-                └── dependencies.yaml
+                └── placement.yaml
 ```
 
 ### 2.3 Layer and Policy Store Layout
+
+**Core layers** are the organization's authoritative declarations — they define what the organization intends, not what providers report. For example, `datacenter-layer.yaml` declares the properties of datacenter `dc-us-east-1` (location, sovereignty zone, available VLANs). Providers are validated against these declarations. The Discovery Service detects drift when provider-reported state diverges from declared layers. Layers are not synced *from* providers — providers are measured *against* them.
 
 ```
 layers/
@@ -479,6 +482,150 @@ escalation:
 ```
 
 The consumer reviews and chooses UPDATE_DEFINITION — the memory was legitimately increased by the infrastructure team for a critical workload. They submit an UPDATE_DEFINITION resolution, which creates a new Requested State reflecting 16Gi memory and updates the Realized State record. Future drift detection will compare against 16Gi.
+
+---
+
+## 8. Example 6 — Three-Tier Application (Meta Provider with Binding Fields)
+
+This example shows how a compound service request flows through the dependency graph, with runtime values from one resource injected into dependent resources via `binding_fields`.
+
+### 8.1 Consumer Request
+
+A consumer requests a "Web Application — Standard" from the catalog. This is a single catalog item backed by a Meta Provider that composes three resources:
+
+```yaml
+# Consumer submits via API
+POST /api/v1/requests
+{
+  "catalog_item_uuid": "webapp-standard-uuid",
+  "fields": {
+    "app_name": "pet-clinic",
+    "environment": "staging",
+    "db_engine": "postgresql",
+    "db_storage_gb": 50,
+    "web_replicas": 2
+  }
+}
+```
+
+### 8.2 Resource Type Spec — WebApp.ThreeTier
+
+The Meta Provider's resource type spec declares three constituent resources and the binding fields that connect them:
+
+```yaml
+resource_type: WebApp.ThreeTier
+entity_type: composite_resource
+constituents:
+  - name: database
+    resource_type: Database.PostgreSQL
+    required: true
+    fields_from_parent:
+      - source: "db_engine"
+        target: "engine"
+      - source: "db_storage_gb"
+        target: "storage_gb"
+      - source: "environment"
+        target: "environment"
+
+  - name: backend
+    resource_type: Compute.VirtualMachine
+    required: true
+    depends_on: [database]
+    binding_fields:
+      - source: "database.ip_address"      # ← from realized Database
+        target: "backend.config.db_host"   # ← injected into Backend payload
+      - source: "database.port"
+        target: "backend.config.db_port"
+      - source: "database.credentials_ref"
+        target: "backend.config.db_credentials_ref"
+    fields_from_parent:
+      - source: "app_name"
+        target: "hostname_prefix"
+      - source: "environment"
+        target: "environment"
+
+  - name: frontend
+    resource_type: Compute.VirtualMachine
+    required: true
+    depends_on: [backend]
+    binding_fields:
+      - source: "backend.ip_address"       # ← from realized Backend
+        target: "frontend.config.api_host" # ← injected into Frontend payload
+      - source: "backend.port"
+        target: "frontend.config.api_port"
+    fields_from_parent:
+      - source: "app_name"
+        target: "hostname_prefix"
+      - source: "web_replicas"
+        target: "replicas"
+      - source: "environment"
+        target: "environment"
+
+lifecycle_policy:
+  on_constituent_failure: rollback_all    # If any constituent fails, decommission all
+```
+
+### 8.3 Pipeline Execution
+
+```
+1. Intent captured — consumer's request stored in intent_records
+
+2. Request Processor assembles the composite payload
+   → Resolves WebApp.ThreeTier resource type spec
+   → Identifies 3 constituent resources with dependency graph:
+     Database (no deps) → Backend (depends on Database) → Frontend (depends on Backend)
+
+3. Policy Engine evaluates the composite request
+   → GateKeeper: staging environment authorized for this tenant
+   → Validation: db_storage_gb within tier limits
+   → Transformation: injects monitoring agent config into all 3 constituents
+
+4. Placement Engine selects providers for each constituent
+   → Database → dcm-provider-database (scored highest for PostgreSQL in staging zone)
+   → Backend → dcm-provider-vm (KubeVirt provider)
+   → Frontend → dcm-provider-vm (same provider, same zone)
+
+5. Request Orchestrator dispatches in dependency order:
+
+   Step 5a: Dispatch Database to dcm-provider-database
+   → Provider realizes PostgreSQL instance
+   → Callbacks: ip_address: 10.0.1.50, port: 5432, credentials_ref: vault:secret/pet-clinic-db
+
+   Step 5b: Request Processor resolves binding_fields for Backend
+   → Injects: config.db_host = 10.0.1.50 (from Database.ip_address)
+   → Injects: config.db_port = 5432 (from Database.port)
+   → Injects: config.db_credentials_ref = vault:secret/pet-clinic-db
+   → Dispatch Backend to dcm-provider-vm
+   → Provider realizes VM with application config containing DB connection
+   → Callbacks: ip_address: 10.0.2.30, port: 8080
+
+   Step 5c: Request Processor resolves binding_fields for Frontend
+   → Injects: config.api_host = 10.0.2.30 (from Backend.ip_address)
+   → Injects: config.api_port = 8080 (from Backend.port)
+   → Dispatch Frontend to dcm-provider-vm
+   → Provider realizes 2 VM replicas with backend endpoint configured
+   → Callbacks: ip_addresses: [10.0.3.10, 10.0.3.11], port: 443
+
+6. All constituents realized — composite entity status: OPERATIONAL
+   → Audit records written for all 4 entities (composite + 3 constituents)
+   → Consumer sees single "pet-clinic" application in their resource list
+```
+
+### 8.4 What the Consumer Sees
+
+The consumer requested one catalog item and sees one composite resource. The three constituent resources are visible as children:
+
+```
+pet-clinic (WebApp.ThreeTier) — OPERATIONAL
+├── pet-clinic-db (Database.PostgreSQL) — OPERATIONAL
+│   ip_address: 10.0.1.50
+├── pet-clinic-backend (Compute.VirtualMachine) — OPERATIONAL
+│   ip_address: 10.0.2.30, config.db_host: 10.0.1.50
+└── pet-clinic-frontend (Compute.VirtualMachine × 2) — OPERATIONAL
+    ip_addresses: [10.0.3.10, 10.0.3.11], config.api_host: 10.0.2.30
+```
+
+If the database is decommissioned, the `lifecycle_policy: rollback_all` cascades to backend and frontend. If the consumer requests a tier upgrade, the Meta Provider coordinates the upgrade across all three constituents, maintaining the binding field connections throughout.
 
 ---
 

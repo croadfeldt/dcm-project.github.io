@@ -137,7 +137,7 @@ layer:
             permitted_resource_types:
               - resource_type: Compute.VirtualMachine
                 operations: [allocate, query_capacity]
-      storage_providers:
+      (prescribed infrastructure)s:
         federation_eligibility:
           mode: none                    # storage never federated — data sovereignty
       network_providers:
@@ -251,10 +251,10 @@ dcm_provider_registration:
   auth:
     mode: mtls
     client_cert_ref:
-      credential_provider_uuid: <uuid>
+      service_provider_uuid: <uuid>
       path: "dcm/dcm-providers/region-eu/client-cert"
     server_ca_ref:
-      credential_provider_uuid: <uuid>
+      service_provider_uuid: <uuid>
       path: "dcm/dcm-providers/region-eu/server-ca"
 
   # Tunnel configuration

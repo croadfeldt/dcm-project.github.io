@@ -2,7 +2,7 @@
 
 > **Status Update (2026-03):** The DCM architecture has been substantially completed. All original 19 architecture review items, 10 session-added items, and 21 community questions have been resolved. The items below represent topics for ongoing community discussion and future evolution.
 >
-> **Current state:** 0 unresolved architectural questions · 299 capabilities across 38 domains · 55 data model documents · 15 specifications · 4 OpenAPI schemas · 6 JSON schemas
+> **Current state:** 0 unresolved architectural questions · 322 capabilities across 39 domains · 57 data model documents · 15 specifications · 4 OpenAPI schemas · 6 JSON schemas · 6 provider types · 2 policy evaluation modes · 9 control plane services
 >
 > **Foundation:** Three abstractions (Data · Provider · Policy) · Unified Governance Matrix · Federated Contribution Model · Full OPA/Rego validation complete
 

@@ -271,7 +271,7 @@ Content-Type: application/health+json
       "status": "pass",
       "observed_at": "<ISO 8601>"
     },
-    "credential_provider_connectivity": {
+    "service_provider_connectivity": {
       "status": "pass",
       "observed_at": "<ISO 8601>"
     }

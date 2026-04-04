@@ -14,16 +14,16 @@ Any structured artifact with a type, UUID, lifecycle state, fields, data classif
 ### PROVIDER — Everything External
 Any external component DCM calls or that calls DCM. All providers implement the **unified base contract** (registration, health, sovereignty, accreditation, governance matrix enforcement, zero trust) plus a **typed capability extension** that declares what operations they expose.
 
-**Eleven provider types (all implement the same base contract):**
-Service Provider (realize resources) · Information Provider (serve external data) · Storage Provider (persist DCM state) · Meta Provider (compose providers) · Policy Provider (evaluate policies externally) · Credential Provider (manage secrets) · Auth Provider (authenticate identities) · Notification Provider (deliver notifications) · Message Bus Provider (async event streaming) · Registry Provider (serve resource type registry) · Peer DCM (federation — another DCM instance IS a typed provider)
+**Twelve provider types (all implement the same base contract):**
+Service Provider (realize resources) · Information Provider (serve external data) · Storage Provider (persist DCM state) · Meta Provider (compose providers) · Policy Provider (evaluate policies externally) · Credential Provider (manage secrets) · Auth Provider (authenticate identities) · Notification Provider (deliver notifications) · Message Bus Provider (async event streaming) · Registry Provider (serve resource type registry) · Peer DCM (federation — another DCM instance IS a typed provider) · ITSM Provider (bidirectional ITSM integration)
 
 **Adding a new provider type** = implement base contract + define capability extension. No core changes.
 
 ### POLICY — Everything That Decides
 Any rule artifact that fires when Data matches conditions, produces a typed output, and is enforced at a declared level. Policies govern every transition, transformation, and constraint.
 
-**Seven policy types (all implement the same base contract):**
-GateKeeper (allow/deny) · Validation (pass/fail) · Transformation (field mutations) · Recovery (failure actions) · Orchestration Flow (pipeline ordering) · Governance Matrix Rule (boundary control) · Lifecycle Policy (relationship event actions)
+**Eight policy types (all implement the same base contract):**
+GateKeeper (allow/deny) · Validation (pass/fail) · Transformation (field mutations) · Recovery (failure actions) · Orchestration Flow (pipeline ordering) · Governance Matrix Rule (boundary control) · Lifecycle Policy (relationship event actions) · ITSM Action (side-effect ITSM record creation)
 
 **Policies ARE the orchestration.** Pipeline steps are policies firing on payload type events. Static flows = Orchestration Flow policies with `ordered: true`. Dynamic flows = conditional policies. Adding/removing pipeline steps = adding/removing policies.
 
@@ -67,6 +67,8 @@ Effective at the core mission · Easy to use · Easy to implement · Easy to ext
 
 **Last Updated:** 2026-03  
 **Status:** Architecture complete — 0 unresolved questions — Ready for implementation
+
+**Note on section structure:** This prompt was built cumulatively across multiple design sessions. Sections 0–57 establish the architecture. Sections 58+ record subsequent additions and refinements. Capability counts, path counts, and domain counts in earlier sections reflect the state at the time that section was written. The authoritative current counts are: **322 capabilities across 39 domains · 57 data model docs · 15 specifications · 72 consumer API paths · 57 admin API paths · 101 event payloads across 22 domains · 6 provider types · 2 policy evaluation modes · 9 control plane services · 119 prompt sections.** When earlier sections conflict with later sections, the later section is authoritative. **Infrastructure (doc 51):** 6 provider types: service_provider, information_provider, meta_provider, auth_provider, peer_dcm, process_provider. Credentials and notifications are service_provider resource types. 2 policy evaluation modes: Internal (DCM evaluates via OPA) and External (external provider evaluates). Four data domains (Intent, Requested, Realized, Discovered) in a single PostgreSQL-compatible database. One required infrastructure: PostgreSQL-compatible DB. Authentication (local accounts + JWT), secrets (envelope encryption), and event routing (LISTEN/NOTIFY) are handled internally. OIDC IdP, Vault, Kafka, Redis, Git are optional deployment enhancements. 9 control plane services.
 
 ---
 
@@ -253,8 +255,8 @@ Every DCM artifact carries a universal metadata block — applies to all artifac
 
 **Contact modes:** UUID+display_name when Identity Provider registered; display_name+email standalone/air-gapped. Both supported.
 
-### 4.7 The Four Provider Types
-All four provider types follow the same base contract (registration, health check, trust, provenance emission):
+### 4.7 Provider Types
+All twelve provider types follow the same base contract (registration, health check, trust, sovereignty, accreditation, governance matrix enforcement, zero trust, provenance emission). See Section 0 for the complete list. The four original categories and their data ownership model:
 
 | Type | Purpose | DCM Owns Result? |
 |------|---------|-----------------|
@@ -262,6 +264,8 @@ All four provider types follow the same base contract (registration, health chec
 | **Information Provider** | Serves authoritative external data DCM references but does not own | No — external system is authoritative |
 | **Meta Provider** | Composes multiple providers into higher-order services | Yes |
 | **Storage Provider** | Persists DCM state — GitOps stores, event streams, audit store, observability | Yes — DCM is authoritative |
+
+Additional provider types: Policy Provider, Credential Provider, Auth Provider, Notification Provider, Message Bus Provider, Registry Provider, ITSM Provider, Peer DCM. All implement the same base contract. See [A-provider-contract.md](data-model/A-provider-contract.md) for the unified contract and all twelve capability extensions.
 
 ---
 
@@ -930,7 +934,9 @@ retain > notify > suspend > detach > cascade > destroy
 ### 12.1 Purpose
 Information Providers are a first-class DCM provider type that serves authoritative external data DCM needs to reference but does not own (HR systems, finance systems, CMDBs). DCM references but never caches or owns external data.
 
-### 12.2 Four Provider Types
+### 12.2 Provider Types — Data Ownership
+
+DCM has twelve provider types (see Section 0 for the complete list). The data ownership question is most relevant to these four categories:
 
 | Type | Purpose | DCM Owns Result? |
 |------|---------|-----------------|
@@ -939,7 +945,7 @@ Information Providers are a first-class DCM provider type that serves authoritat
 | **Meta Provider** | Composes multiple providers into higher-order services | Yes |
 | **Storage Provider** | Persists DCM state — GitOps stores, event streams, audit, observability | Yes — DCM is authoritative |
 
-All four provider types follow the same base contract: registration, health check, trust, and provenance emission obligation.
+All twelve provider types follow the same base contract: registration, health check, trust, sovereignty, accreditation, governance matrix enforcement, zero trust, and provenance emission obligation.
 
 ### 12.3 Same Contract as Service Providers
 Information Providers follow the same registration, health check, trust, and capacity model as Service Providers where applicable. Capacity = query capacity (requests/sec). Naturalization/Denaturalization = translating native format to DCM unified format.
@@ -1423,7 +1429,7 @@ Policy Providers   — external authoritative policy sources (fifth provider typ
 ### 21.2 Policy Groups
 A **Policy Group** is a cohesive collection of policies addressing a single identifiable concern.
 
-**Concern types:** `technology | compliance | sovereignty | business | operational | security`
+**Concern types:** `security | compliance | operational | recovery_posture | zero_trust_posture | data_authorization_boundary | orchestration_flow`
 
 **Key fields:** `handle` (domain/group/name), `concern_type`, `concern_tags`, `extends` (inherits parent), `policies` (constituent policies), `activation_scope` (resource types, tenant tags, regions), `conflicts_with` (explicit conflict declarations), `source` (local or policy_provider)
 
@@ -3294,7 +3300,7 @@ Recovery Policies are a formal DCM policy type (alongside GateKeeper, Validation
 
 Binding hierarchy: resource-type override > Tenant override > profile default > system default (automated-reconciliation).
 
-`recovery_posture` is the fifth Policy Group concern_type (alongside security, compliance, operational, implementation posture).
+`recovery_posture` is a Policy Group concern_type (alongside security, compliance, operational, zero_trust_posture, data_authorization_boundary, orchestration_flow).
 
 ### 49.6 Late Response Pipeline
 
@@ -3441,7 +3447,7 @@ All three checks run at every interaction boundary. All five boundary checks (id
 
 ### 51.2 Data Classification — First-Class Field Metadata
 
-Seven classification levels: `public | internal | confidential | restricted | phi | pci | sovereign | classified`
+Eight classification levels: `public | internal | confidential | restricted | phi | pci | sovereign | classified`
 
 Carried as `data_classification` on every field in every DCM payload. Declared in: Resource Type Specification (default per field), Data Layer (domain-wide override), explicit field instance (highest precedence). `phi`, `sovereign`, `classified` are **immutable once set** — no layer or policy may downgrade them (ACC-003). Default for unclassified fields: `internal`.
 
@@ -4776,7 +4782,7 @@ Scoring editor: visual slider with hard-stop — auto_approve_below slider maxim
 Flow GUI accessible via link or embedded iframe for policy_owner/sre roles.
 
 ### Provider Management (dcm-provider-gui-spec.md)
-Common shell for ALL 11 provider types: overview, config, health history, audit trail, notifications.
+Common shell for ALL 12 provider types: overview, config, health history, audit trail, notifications.
 Provider ownership: declared at registration (owner_team_uuid); provider_owner role scoped per provider UUID.
 Service Provider extensions: capacity management (manual override for emergencies), managed entities with drift indicators, naturalization mapping viewer, test naturalization tool, interim status config.
 Credential Provider extensions: inventory (metadata only — NEVER values), rotation management, revocation registry search, external CA config (protocol, chain, CRL/OCSP status), algorithm compliance view (forbidden algorithms must be zero).
@@ -5384,7 +5390,7 @@ All gaps from Section 92 gap analysis resolved.
 - Scheduled Requests: 3 new admin paths for maintenance windows: GET/POST /maintenance-windows, GET/PATCH/DELETE /maintenance-windows/{uuid}, GET /maintenance-windows/{uuid}/scheduled-requests. Schemas: MaintenanceWindow, MaintenanceWindowCreate, MaintenanceWindowPatch.
 - Workload Analysis: 2 new consumer paths — GET /resources/{uuid}/workload-profile, POST /resources/{uuid}/workload-profile:analyze. WorkloadProfile schema added.
 - Accreditation Monitor: 3 new admin paths — :verify, :configure-webhook, /contract-event.
-- Final counts: consumer 63 paths / 33 schemas; admin 56 paths / 27 schemas.
+- Final counts: consumer 63 paths / 33 schemas; admin 57 paths / 27 schemas.
 
 **Tier 2 — Implementation Gaps (doc 49 — 49-implementation-specifications.md, 728 lines):**
 - Rate Limiting (sec 2): Token bucket at API Gateway. Per-actor bucket, profile-governed parameters (60/min minimal to 600/min prod), PT120S TTL on state. 5 policies RLM-001 through RLM-005.
@@ -5702,7 +5708,7 @@ When working on this project, apply these instructions in addition to the number
 211. **Profile coverage added to docs 36-39** — doc36 cert lifetime table(P180D minimal→P14D sovereign), algorithm min table; doc37 max scheduling horizon(P365D minimal→P7D sovereign), concurrent scheduled limit, maintenance window approval tier; doc38 max group size(100 minimal→5 sovereign), group timeout max, field injection validation strictness, nesting depth; doc39 metrics scraping restrictions(sovereign internal only), /api/v1/admin/health MFA requirements(fsi/sovereign)
 212. **40-standards-catalog.md is the authoritative standards reference** — 19 RFCs, 3 cryptographic standards tables (permitted algorithms, forbidden algorithms, FIPS levels), 6 compliance frameworks, 7 CNCF ecosystem projects, W3C SSE, OpenAPI 3.1, SPIFFE (informative), HashiCorp Vault PKI / Venafi / EJBCA as External CA Credential Provider backends (NOT Auth Providers); Section 9 maps all 17 policy families to their standards basis; usage map tracks which standards appear in which documents
 213. **41-operational-reference.md covers the three operational gaps** — GitOps partitioning (3 strategies; tenant-shard recommended; trigger thresholds table), store migration (5-phase dual-write playbook; never decommission source before burn-in; audit chain continuity required OPS-002), DR (5 scenarios; post-recovery validation checklist mandatory OPS-005; Audit Store minimum P365D retention all profiles OPS-006); RTO: PT1M sovereign component → PT24H minimal repave
-214. **Three GUI specs define the unified DCM web application** — one application with role-gated surfaces: Consumer Portal (all actors — catalog, SSE live status with constituent tracking, resources, approvals, cost, sessions), Admin Panel (platform roles — health dashboard, tier registry drag-drop editor with hard-stops, scoring slider max 50), Provider Management (provider_owner role — 11 provider types with common shell + type-specific tabs; Credential Provider shows metadata never values; algorithm compliance must show zero forbidden algorithm violations)
+214. **Three GUI specs define the unified DCM web application** — one application with role-gated surfaces: Consumer Portal (all actors — catalog, SSE live status with constituent tracking, resources, approvals, cost, sessions), Admin Panel (platform roles — health dashboard, tier registry drag-drop editor with hard-stops, scoring slider max 50), Provider Management (provider_owner role — 12 provider types with common shell + type-specific tabs; Credential Provider shows metadata never values; algorithm compliance must show zero forbidden algorithm violations)
 215. **Doc 42 adds 12th provider type (ITSM Provider) and 8th policy type (ITSM Action Policy)** — ITSM is ADDITIVE (DCM never requires it); ITSM Action Policy is side-effect only (non-blocking default); block_until_created requires block_timeout (never permanently stalls pipeline, ITSM-005); recorded_via field already existed on approval vote — ITSM inbound approvals use it; 6 policy examples covering ServiceNow + Jira for provisioning, CMDB sync, incident on drift, decommission; itsm.* event domain adds 3 events (85 total, 21 domains)
 215. **Consumer GUI ITSM bridge (GUI-011, section 8 of dcm-consumer-gui-spec.md)** — ITSM is a CONSUMER of DCM events, not a source of truth; DCM is the system of record; CMDB sync is one-way DCM→CMDB via Notification Provider subscription to entity.* events; ITSM approval votes call POST /api/v1/admin/approvals/{uuid}/vote — the CAB process happens in ITSM, DCM just records the outcome; ITSM references stored as business data fields on entities; Audit Trail (section 11) is consumer-scoped own-resource view; cross-tenant audit is Admin Panel only
 215. **RHDH/Backstage is the PRIMARY consumer GUI deployment model** — 6 Dynamic Plugin packages (no RHDH rebuild); Scaffolder IS the request form (auto-generated templates from catalog item JSON Schema); DCMService + DCMResource entity kinds sync to RHDH catalog every PT5M; tenancy via RHDH Group context → X-DCM-Tenant; OIDC token exchange for auth delegation; PatternFly NavGroup/NavItem/NotificationBadge for sidebar; Approvals shows live pending count badge; all compliance enforced by DCM control plane — RHDH is a client
@@ -5714,3 +5720,39 @@ When working on this project, apply these instructions in addition to the number
 190. **key_usage is declared at issuance and validated at use** (CPX-009) — a credential issued for authentication cannot be used for signing; Credential Provider must validate this at the validate endpoint; prevents algorithm confusion attacks
 188. **Actor deprovisioning and entity decommissioning trigger immediate credential revocation** (CPX-006, CPX-007) — deprovisioning publishes revocation events before the deprovisioning is acknowledged; decommission is blocked until all entity-scoped credentials are revoked
 185. **provided_by: external constituents are placed by DCM's Placement Engine** — all governance controls (sovereignty, accreditation, trust) apply; the Meta Provider has no influence over external constituent provider selection
+
+---
+
+## Session: Architecture Consistency and Policy Model (April 2026)
+
+**Summary:** Infrastructure consolidated to 1 required dependency (PostgreSQL). Auth, secrets, and events handled internally by default with optional external delegation. Policy evaluation model expanded with Evaluation Context, Constraint Type Registry, and Policy Templates. Full consistency pass across all 57 data model docs and 15 specifications.
+
+216. **One required infrastructure: PostgreSQL** — Authentication (local accounts + argon2id + DCM-issued JWT), secrets (envelope encryption with AES-256-GCM + KEK from environment), and event routing (LISTEN/NOTIFY) are all handled internally. External systems (OIDC IdP, Vault, Kafka, Redis, Git, service mesh) are optional deployment enhancements registered through the standard provider contract.
+
+217. **Internal/External pattern applied three times** — Policy evaluation (Internal: OPA evaluates; External: external provider evaluates). Secrets management (Internal: PostgreSQL secrets table + envelope encryption; External: Vault-compatible API). Authentication (Internal: actors table + argon2id + JWT; External: auth_provider — OIDC, SAML, LDAP). Same pattern, consistent across all three domains.
+
+218. **Data-driven policy matching** (doc B §2) — A policy fires when the data says it should fire. Any field from three sources (request payload, evaluation context, entity metadata) can be a match trigger. No pre-assignment of policies to resource types. Specificity ranges from universal (no conditions) to fully scoped (VMs in DMZ in zone A for application UUID XXXXX).
+
+219. **Evaluation Context with multi-pass convergence** (doc B §7) — Transient constraint space scoped to one request evaluation. Three phases per pass: collect constraints, resolve conflicts, apply and validate. Hard/soft constraint binding. Auto-resolution via declared `on_conflict` strategies. Maximum 3 passes (configurable). Unresolvable hard-hard conflicts escalate to human. Per-pass audit captures complete context snapshots.
+
+220. **Constraint Type Registry** (doc B §8) — Shared vocabulary for the Evaluation Context. Each constraint type has a canonical name, OpenAPI v3 schema, emittable_by/consumable_by declarations. 10 built-in types (zone_restriction, distribution_requirement, cost_ceiling, network_restriction, resource_limits, compliance_requirement, sovereignty_boundary, approval_requirement, scheduling_constraint, provider_restriction). Organizations register custom types. Validation at policy activation catches vocabulary mismatches at authoring time.
+
+221. **Policy Templates** (doc B §9) — Gatekeeper ConstraintTemplate pattern adapted for DCM. Templates define reusable Rego logic with parameter schemas and declared emitted/consumed constraint types. Policy artifacts are instances binding parameters and match conditions. DCM auto-generates `data.dcm.constraint_types` Rego library from the Constraint Type Registry — constructor functions enforce schemas at compile time.
+
+222. **Doc 11 rewritten** as "Data Store Contracts" (791→154 lines) — Enforcement rules for the four PostgreSQL data domains (append-only, RLS, hash chain, REVOKE grants). No storage provider abstraction.
+
+223. **Doc 31 rewritten** as "Credential Management" (979→154 lines) — Internal secrets via PostgreSQL envelope encryption (default). External via Vault-compatible API (optional). Consumer-facing credentials handled by service_provider with Credential.* resource types.
+
+224. **Doc A §7 rewritten** as 6 provider types (556→387 lines) — Removed Storage, Policy, Credential, Notification, Message Bus, Registry, ITSM as separate types. Added Process Provider (ephemeral workflow execution). Service Provider description updated to cover Credential.*/Notification.*/ITSM.* resource types.
+
+225. **Doc 14 §4 rewritten** — "Policy Providers" (4 modes) → "Policy Evaluation Modes" (Internal/External). BBQ-001–009 governance preserved for External mode. Mode numbering removed.
+
+226. **Doc 02 §4 rewritten** — "Storage Provider Model" → "Data Domain Model" with PostgreSQL table enforcement. Git as optional ingress adapter, not a state store.
+
+227. **Capabilities matrix updated** — 309→322 capabilities. Added: POL-008 (Constraint Type Registry), POL-009 (Evaluation Context), POL-010 (Policy Templates), POL-011 (DCM Constraint Types Library), POL-012 (Data-Driven Matching), STO-010 (Internal Secrets), STO-011 (Pipeline Event Routing), STO-012 (Internal Authentication). Domain 13 (Storage) rewritten for PostgreSQL. Domain 23 renamed to Credential Management.
+
+228. **Bulk consistency pass** — Zero old provider type references remain outside AI prompt historical sections. Zero old store model references. Zero old policy mode references (Mode 3/4) in policy contexts (information provider retrieval modes correctly retained). All "3 required infrastructure" / "Vault required" / "Keycloak required" references updated.
+
+229. **Unified audit and payload integrity via Merkle tree** (doc 16 §8) — RFC 9162 (Certificate Transparency v2.0) pattern. Each audit record is a Merkle leaf with input/output payload hashes, service signature, and tree position. Inclusion proofs (O(log n)), consistency proofs, and request chain verification unify audit trail integrity and payload chain of custody into one mechanism. Satisfies NIST 800-53 AU-9(3), AU-10(2/3/5), SI-7; FIPS 186-5 (Ed25519); FedRAMP High AU-10.
+
+230. **Configurable audit granularity** (doc 16 §8.1) — Three levels: `stage` (~6 leaves/request — one per pipeline stage), `mutation` (~15-30 leaves — one per layer merge, policy evaluation, constraint resolution), `field` (mutation + per-field old/new value hashes). Profile defaults: minimal/dev → stage, standard/prod → mutation, fsi/sovereign → field (minimum, cannot downgrade). Inter-stage verification: synchronous (fsi/sovereign required), asynchronous, or disabled (homelab).

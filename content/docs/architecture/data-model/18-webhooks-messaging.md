@@ -103,7 +103,7 @@ ingress:
 
   # Surface-specific detail
   webhook_registration_uuid: <uuid>   # if surface: webhook_inbound
-  message_bus_provider_uuid: <uuid>   # if surface: message_bus_inbound
+  (optional infrastructure)_uuid: <uuid>   # if surface: message_bus_inbound
   message_offset: <string>            # if surface: message_bus_inbound
   scheduler_job_uuid: <uuid>          # if surface: scheduler
   parent_request_uuid: <uuid>         # if surface: policy_engine|rehydration
@@ -117,7 +117,7 @@ All outbound calls from DCM carry DCM's authenticated identity:
 ```yaml
 egress:
   surface: <webhook_outbound|message_bus_outbound|provider_api|
-            mode4_query|storage_provider|credential_provider|auth_provider>
+            mode4_query|(prescribed infrastructure)|service_provider|auth_provider>
   protocol: <https|kafka|amqp|grpc>
   actor:
     uuid: <dcm_component_uuid>
@@ -126,7 +126,7 @@ egress:
                 policy_engine|placement_engine|...>
     authenticated_via: <hmac_sha256|mtls|bearer_token|api_key>
     credential_ref:
-      credential_provider_uuid: <uuid>
+      service_provider_uuid: <uuid>
       secret_path: <path>
   originating_request_uuid: <uuid>
   originating_actor_uuid: <uuid>
@@ -153,7 +153,7 @@ policy: "If ingress.actor.external_identity.claims.department EXISTS THEN inject
 policy: "If ingress.surface == message_bus_inbound AND ingress.actor.type != webhook_service_account THEN gatekeep"
 
 # Sovereignty check on inbound message bus
-policy: "If ingress.surface == message_bus_inbound AND message_bus_provider.jurisdiction != tenant.sovereignty_zone THEN gatekeep"
+policy: "If ingress.surface == message_bus_inbound AND (optional infrastructure).jurisdiction != tenant.sovereignty_zone THEN gatekeep"
 ```
 
 
@@ -256,7 +256,6 @@ quota_policy:
 >
 > **For new implementations:** Use the Notification Provider subscription model (doc 23, Section 6) with a webhook-type Notification Provider.
 >
-> **For existing webhook registrations:** The registration model below remains supported via a compatibility layer. Existing registrations are automatically treated as actor-level subscriptions with a webhook-type Notification Provider. No migration required for current deployments.
 >
 > The key improvement in the new model: audience is derived from the **entity relationship graph**, not from a manually maintained subscriber list. A webhook subscription for VLAN drift events will now automatically include all VMs attached to that VLAN as audience context.
 
@@ -310,7 +309,7 @@ webhook_registration:
   authentication:
     mode: <hmac_sha256|mtls|bearer_token>
     secret_ref:
-      credential_provider_uuid: <uuid>
+      service_provider_uuid: <uuid>
       secret_path: "dcm/webhooks/payments-drift/hmac-secret"
     rotation_policy:
       automatic: true
@@ -437,7 +436,7 @@ webhook_actor:
   authentication:
     mode: hmac_sha256
     secret_ref:
-      credential_provider_uuid: <uuid>
+      service_provider_uuid: <uuid>
       secret_path: "dcm/webhooks/inbound/cicd-pipeline/hmac"
 
   # Authorization
@@ -475,7 +474,7 @@ A **Message Bus Provider** is the sixth DCM provider type — a persistent, high
 ### 5.2 Registration
 
 ```yaml
-message_bus_provider_registration:
+(optional infrastructure)_registration:
   artifact_metadata:
     uuid: <uuid>
     handle: "providers/messagebus/corporate-kafka"
@@ -496,12 +495,12 @@ message_bus_provider_registration:
   connection:
     brokers: [kafka-1.corp:9093, kafka-2.corp:9093, kafka-3.corp:9093]
     credentials_ref:
-      credential_provider_uuid: <uuid>
+      service_provider_uuid: <uuid>
       secret_path: "dcm/providers/messagebus/corporate-kafka/credentials"
     tls:
       mode: mtls
       ca_cert_ref:
-        credential_provider_uuid: <uuid>
+        service_provider_uuid: <uuid>
         secret_path: "dcm/providers/messagebus/corporate-kafka/ca-cert"
 
   # Outbound — DCM publishes to external bus

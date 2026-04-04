@@ -815,7 +815,7 @@ Response 200:
       "display_name": "NetworkOps Team",
       "audience_role": "owner",
       "stakeholder_reason": null,
-      "notification_providers": ["slack-corp", "pagerduty-prod"]
+      "service_providers": ["slack-corp", "pagerduty-prod"]
     },
     {
       "actor_uuid": "<uuid>",
@@ -826,11 +826,11 @@ Response 200:
         "via_relationship": "attached_to",
         "stake_strength": "required"
       },
-      "notification_providers": ["slack-corp"]
+      "service_providers": ["slack-corp"]
     }
   ],
 
-  "active_notification_providers": [
+  "active_service_providers": [
     {
       "provider_uuid": "<uuid>",
       "display_name": "slack-corp",

@@ -27,12 +27,14 @@ The four states are the foundational model for how DCM tracks the complete lifec
 
 The four states answer four distinct questions:
 
-| State | Question Answered | Store Type |
-|-------|------------------|------------|
-| **Intent State** | What did the consumer ask for? | GitOps Store (required) |
-| **Requested State** | What was approved and dispatched to the provider? | Write-once Storage Provider (GitOps reference impl) |
-| **Realized State** | What did the provider actually build? | Write-once Snapshot Store (authorized changes only) |
-| **Discovered State** | What does DCM observe actually existing right now? | Ephemeral Snapshot Store |
+| State | Question Answered | Data Domain |
+|-------|------------------|-------------|
+| **Intent State** | What did the consumer ask for? | `intent_records` — append-only, immutable |
+| **Requested State** | What was approved and dispatched to the provider? | `requested_records` — append-only, immutable |
+| **Realized State** | What did the provider actually build? | `realized_entities` — versioned snapshots, `is_current` flag |
+| **Discovered State** | What does DCM observe actually existing right now? | `discovered_records` — ephemeral, refreshed per discovery run |
+
+> **Infrastructure note (doc 51):** All four data domains are stored in a single PostgreSQL-compatible database. The logical distinctions (immutability rules, versioning model, query patterns) are preserved via table design, `REVOKE UPDATE/DELETE`, and RLS. Git, Kafka, and Redis are optional deployment enhancements, not architectural requirements. See [51-infrastructure-optimization.md](51-infrastructure-optimization.md).
 
 ---
 
@@ -78,7 +80,7 @@ The **Realized State** is the provider-confirmed record of what was actually bui
 **Characteristics:**
 - Write-once complete snapshots — each Realized State record is a full entity state, never modified after writing
 - Every Realized State record is traceable to exactly one Requested State record — no exceptions
-- Stored in a Write-once Snapshot Store keyed by entity UUID
+- Stored in a realized_entities table keyed by entity UUID
 - Contains provider-specific details not in the Requested State — assigned IPs, generated passwords, actual storage sizes, provider-internal IDs
 - Is the authoritative record of what actually exists from DCM's perspective
 - Drift is detected by comparing the most recent Realized State snapshot against Discovered State
@@ -107,7 +109,7 @@ The **Discovered State** is what DCM observes actually existing through active d
 
 **Characteristics:**
 - Append-only snapshot stream — each discovery cycle produces a new snapshot
-- Stored in an Event Stream Store (ephemeral) — recent history retained, older snapshots archived or discarded
+- Stored in an pipeline_events table (ephemeral) — recent history retained, older snapshots archived or discarded
 - High-frequency and machine-generated — not appropriate for human review
 - Used exclusively for drift detection — comparing against Realized State
 - May contain resources DCM did not provision — brownfield resources discovered for ingestion
@@ -151,105 +153,64 @@ Given an entity UUID, DCM can reconstruct the complete history of that entity ac
 
 ---
 
-## 4. Physical Representation — Storage Provider Model
+## 4. Physical Representation — Data Domain Model
 
-DCM describes store **contracts**, not implementations. Each store is a Storage Provider — a formal DCM provider type with registration, health check, and trust obligations. Implementors choose the technology that satisfies the contract.
+All four states are stored in DCM's PostgreSQL-compatible database as distinct data domains. Each domain has specific immutability rules, access patterns, and enforcement mechanisms — but they share a single infrastructure dependency. See [Infrastructure Requirements](51-infrastructure-optimization.md) for the prescribed infrastructure model and [Data Store Contracts](#41-data-store-contracts) below for the enforcement rules.
 
-See [Storage Providers](11-storage-providers.md) for the complete contract specifications.
+Git is available as an optional ingress adapter — consumers who prefer PR-based workflows can submit intent via Git. But Git is an ingress path, not a state store. DCM's state lives in PostgreSQL.
 
-### 4.1 GitOps Stores (Intent and Requested)
+### 4.1 Data Store Contracts
 
-**Contract characteristics:**
-- Branch-per-request — each request is a branch in the store
-- Pull Request semantics — review, comment, approve, merge
-- Immutable history — commits are permanent records
-- CI/CD hook support — commits trigger pipeline execution
-- Indexed for query — a Search Index projection enables field-based queries at scale
-- Entity UUID → file path mapping maintained in the Search Index
+Each data domain enforces its contract through PostgreSQL-native mechanisms:
 
-**Intent Store — GitOps implementation required:**
-The PR workflow, branch-per-request semantics, and human review flow are first-class features of the Intent Store — not implementation details. GitOps is the only supported implementation for the Intent Store.
+| Domain | Table | Immutability | Enforcement |
+|--------|-------|-------------|-------------|
+| **Intent** | `intent_records` | Append-only — new intent creates a new row, previous intents never modified | `REVOKE UPDATE, DELETE` on table; RLS per tenant |
+| **Requested** | `requested_records` | Append-only — each policy evaluation produces a new version with full provenance | `REVOKE UPDATE, DELETE` on table; RLS per tenant |
+| **Realized** | `realized_entities` | Versioned snapshots — each state change creates a new row with `is_current` flag | Append-on-change semantics; `is_current` enforces single latest; RLS per tenant |
+| **Discovered** | `discovered_records` | Ephemeral — each discovery run produces fresh snapshots; previous runs retained for trend analysis | Grouped by `discovery_run_uuid`; RLS per tenant |
 
-**Requested Store — write-once Storage Provider (GitOps is the reference implementation):**
-The Requested Store requires write-once semantics and hash-chain integrity but does not require GitOps PR mechanics — the Requested State is machine-generated output, not consumer input. The GitOps implementation is the reference implementation and suitable for small-to-medium deployments. For production scale (thousands of requests per day), a purpose-built write-once document store is explicitly supported.
+**Pipeline events** flow between control plane services via the `pipeline_events` table with PostgreSQL `LISTEN/NOTIFY` for real-time routing. For high-throughput deployments, Kafka can be added alongside as an optional enhancement.
 
-The distinction matters for the following reasons:
-- Git performance degrades at scale (large repo size, high-frequency machine writes)
-- PR semantics (branch creation, merge, CI hooks) add latency and overhead with no workflow benefit for machine-generated content
-- Sensitive assembled payload data may warrant stricter field-level access control than Git provides
-- A write-once document store with hash-chain integrity satisfies all Requested Store contracts without Git's operational constraints
+**Audit records** are stored in `audit_records` with a SHA-256 hash chain (each record's hash includes the previous record's hash), append-only enforcement (`REVOKE UPDATE, DELETE` + trigger-based immutability guard), and per-entity chain sequence numbers.
 
-**Typical implementations (Intent Store):** GitHub, GitLab, Gitea, Forgejo
+### 4.2 Realized State Snapshot Model
 
-**Typical implementations (Requested Store):** GitHub/GitLab/Gitea (reference implementation); PostgreSQL with write-once enforcement + Merkle hash chain (production scale); CockroachDB (geo-distributed)
-
-**Repository structure:** Resolved. See [Worked Examples](04-examples.md) Section 2 for the complete Git directory layout. Provider selection is recorded in the assembled payload (placement.yaml), not in the directory structure — directories are independent of provider selection (Q54 resolved).
-
-### 4.2 Write-once Snapshot Store (Realized State)
-
-The Realized Store uses a **write-once snapshot model** — each Realized State record is a complete entity state snapshot, not a field-level event. This model aligns with the constraint that Realized State only changes via authorized requests.
-
-**Contract characteristics:**
-- Write-once — each snapshot record is immutable after creation; updates create new snapshot records
-- Complete snapshots — each record captures the full entity state, not a delta from previous state
-- Entity-UUID-keyed — O(1) lookup of all snapshots for a given entity
-- Supersession chain — each record references the snapshot it superseded and the Requested State record that authorized the change
-- Queryable by timestamp — point-in-time state reconstruction is a direct lookup, not a replay
-- Traceable — every record has a non-nullable `corresponding_requested_state_uuid` field
-
-**Realized State snapshot record structure:**
+The Realized domain uses a **snapshot model** — each record is a complete entity state, not a delta. This makes rehydration a direct lookup rather than an event replay, and point-in-time queries ("what was the state on March 15?") are direct lookups.
 
 ```yaml
 realized_state_snapshot:
-  realized_state_uuid: <uuid>            # this snapshot's identity
-  entity_uuid: <uuid>                    # entity this belongs to
+  realized_uuid: <uuid>                  # this snapshot's identity
+  entity_uuid: <uuid>                    # stable entity identity across versions
   realized_at: <ISO 8601>
 
   # Always traceable to a request — mandatory, not nullable
   source_type: <initial_realization|consumer_update|provider_update>
-  corresponding_requested_state_uuid: <uuid>
+  request_uuid: <uuid>
 
-  # Supersession chain
-  supersedes_realized_state_uuid: <uuid|null>    # null for first realization
-  superseded_by_realized_state_uuid: <uuid|null> # null for current record
+  # Versioning
+  version_major: <int>
+  version_minor: <int>
+  version_revision: <int>
+  is_current: <boolean>                  # only one current per entity_uuid
 
   # Complete entity state at this point — all fields, all provenance
   fields:
     # [full entity state in DCM Unified Data Model format]
 
   # Provider-added fields
-  provider_entity_id: <string>
-  provider_reported_at: <ISO 8601>
+  provider_metadata:
+    provider_entity_id: <string>
+    provider_reported_at: <ISO 8601>
 ```
 
-**Why snapshots instead of events:**
-Rehydration from Realized State requires a complete entity state — not a replay of field-level events. A snapshot model makes rehydration a direct lookup rather than an event replay. Point-in-time queries ("what was the Realized State on March 15?") are also direct lookups. The Realized Store does not need the high-frequency write throughput of an event stream — it is written only when an authorized change completes.
+**Why snapshots instead of events:** Rehydration requires a complete entity state, not a replay of field-level events. The Realized domain is written only when an authorized change completes — it does not need high-frequency write throughput.
 
-**Typical implementations:** PostgreSQL with write-once constraints; CockroachDB; etcd (small deployments)
+### 4.3 Query and Caching
 
-### 4.3 Ephemeral Snapshot Store (Discovered State)
+For read-heavy workloads (catalog browsing, placement lookups, resource listing), PostgreSQL materialized views provide derived projections optimized for specific query patterns. These views are explicitly non-authoritative — the base tables always win if a view and a table disagree.
 
-The Discovered Store retains its event stream model — discovery is high-frequency, machine-generated, and ephemeral. It is never a rehydration source by definition (discovered state was never authorized through DCM).
-
-**Contract characteristics:**
-- Append-only snapshot stream — each discovery cycle produces a new snapshot
-- Entity-UUID-keyed streams — each entity has its own snapshot stream
-- Replayable — for trending and historical discovery analysis
-- High throughput — designed for machine-generated, high-frequency writes
-- Ephemeral — retention policy governs how long snapshots are kept (see RHY-008)
-
-**Typical implementations:** Kafka with log compaction, EventStoreDB, Apache Pulsar
-
-### 4.3 Search Index (Git Store Projection)
-
-**Contract characteristics:**
-- Derived from Git stores — rebuilt from Git history on demand
-- Explicitly non-authoritative — Git always wins if index and Git disagree
-- Queryable by indexed fields: entity_uuid, tenant_uuid, resource_type, lifecycle_state, timestamp, cost_center, business_unit, provider_uuid
-- Lightweight — stores indexed fields only, not full payloads
-- Fast — designed for millisecond query response at millions of records
-
-**Typical implementations:** Elasticsearch, OpenSearch, Meilisearch
+For deployments requiring geographically distributed read performance, Redis can be added as an optional caching layer in front of materialized views.
 
 ---
 

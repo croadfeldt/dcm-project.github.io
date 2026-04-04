@@ -294,7 +294,7 @@ authorized_tier_configuration:
   # Per-action-type overrides
   action_type_overrides:
     - subject_type: provider_registration
-      provider_type: credential_provider
+      provider_type: service_provider
       dcmgroup_handle: platform/credential-governance
       quorum_threshold: "3 of 5"
     - subject_type: federation_contribution

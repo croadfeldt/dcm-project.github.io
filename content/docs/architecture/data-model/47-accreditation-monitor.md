@@ -453,7 +453,7 @@ accreditation_monitor_config:
   global_stale_after: P7D
   global_failure_threshold: 3
   escalation_contact:
-    notification_provider_uuid: <uuid>
+    service_provider_uuid: <uuid>
     urgency: critical
 ```
 

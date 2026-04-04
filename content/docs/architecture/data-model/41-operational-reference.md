@@ -8,7 +8,7 @@
 
 ---
 
-## 1. GitOps Store Scale and Partitioning
+## 1. DCM database Scale and Partitioning
 
 ### 1.1 When a Repo Becomes Too Large
 
@@ -233,7 +233,7 @@ migration_checklist:
   - Test audit chain write under partition scenario
 ```
 
-#### GitOps Store — Repo Restructuring
+#### DCM database — Repo Restructuring
 
 Restructuring a GitOps repository (e.g. monorepo to sharded) requires special handling because Git history must be preserved.
 
@@ -348,7 +348,7 @@ RPO: profile-governed — see Audit Store write buffer policy
 4. Verify chain integrity: dcm-admin audit chain-verify --since <outage-start>
 ```
 
-**GitOps Store failure (Intent/Requested/Layer):**
+**DCM database failure (Intent/Requested/Layer):**
 
 ```
 RTO: PT30M (stores are remountable from Git remote)

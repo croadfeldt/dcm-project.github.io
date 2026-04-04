@@ -70,9 +70,9 @@ subject:
   # actor                — human or service account making a request
   # service_provider     — Service Provider sending/receiving data
   # dcm_peer             — federated DCM instance
-  # policy_provider      — Policy Provider receiving payload data for evaluation
-  # storage_provider     — Storage Provider receiving/returning state data
-  # notification_provider — Notification Provider receiving notification envelopes
+  # external_policy_evaluation      — Policy Provider receiving payload data for evaluation
+  # (prescribed infrastructure)     — Storage Provider receiving/returning state data
+  # service_provider — Notification Provider receiving notification envelopes
   # information_provider — Information Provider returning external data
   # system               — DCM internal component (Request Orchestrator, etc.)
 
@@ -130,8 +130,8 @@ The target is where the data is going — provider, peer DCM, storage, notificat
 ```yaml
 target:
   type: <target_type>
-  # service_provider | dcm_peer | storage_provider | notification_provider |
-  # information_provider | policy_provider | external_endpoint
+  # service_provider | dcm_peer | (prescribed infrastructure) | service_provider |
+  # information_provider | external_policy_evaluation | external_endpoint
 
   # Identity
   provider_uuid: <uuid>                  # specific provider
@@ -482,7 +482,7 @@ profile_matrix_defaults:
       enforcement: hard
       match:
         data.classification: [sovereign, classified]
-        target.type: [dcm_peer, service_provider, notification_provider]
+        target.type: [dcm_peer, service_provider, service_provider]
       decision: DENY
       reason: "Sovereign and classified data never crosses any boundary — any profile"
 
@@ -571,7 +571,7 @@ profile_matrix_defaults:
       enforcement: soft
       match:
         data.classification: restricted
-        target.type: notification_provider
+        target.type: service_provider
       decision: STRIP_FIELD
       field_permissions:
         mode: blocklist

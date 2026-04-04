@@ -303,7 +303,7 @@ payload:
 ```yaml
 payload:
   provider_uuid: <uuid>
-  provider_type: service_provider | meta_provider | credential_provider | auth_provider | ...
+  provider_type: service_provider | meta_provider | service_provider | auth_provider | ...
   provider_handle: <string>
   resource_types_affected: [<string>]  # on deregistered: types now unserviced
   active_entity_count: <int>           # on deregistered: entities at risk

@@ -36,7 +36,7 @@ The Universal Audit Model defines the **unconditional obligation** for every DCM
 
 ## 2. Design Principles
 
-**Universal — no exceptions.** Every mutation to every DCM artifact produces an audit record. Resources, policies, layers, groups, relationships, providers, configurations, authorizations, mode 4 queries, ingestion events, rehydration events, drift events, login events — all covered.
+**Universal — no exceptions.** Every mutation to every DCM artifact produces an audit record. Resources, policies, layers, groups, relationships, providers, configurations, authorizations, external evaluation queries, ingestion events, rehydration events, drift events, login events — all covered.
 
 **Append-only — tamper-evident.** Audit records are never modified or deleted while retention obligations apply. Each record carries a hash of its own content and a reference to the previous record's hash — forming a tamper-evident chain per entity.
 
@@ -81,7 +81,7 @@ audit_record:
     request_uuid: <uuid — originating request, if applicable>
     policy_uuid: <uuid — policy that triggered this, if applicable>
     policy_version: <version — of the policy at time of execution>
-    correlation_id: <cross-system ID — e.g., Mode 4 audit_token>
+    correlation_id: <cross-system ID — e.g., external evaluation audit_token>
 
   # WHAT — the subject of the change
   subject:
@@ -136,7 +136,7 @@ audit_record:
       placement_phase: <pre|loop|post>
       missing_fields: [<field paths if implicit_approval>]
 
-    # For QUERY (Mode 4 black box)
+    # For QUERY (external evaluation)
     query_detail:
       provider_uuid: <uuid>
       fields_queried: [<field names — not values>]
@@ -209,7 +209,7 @@ The `action` field uses a closed vocabulary. Free-text actions are invalid and r
 | `AUTHORIZE` | Cross-tenant, actors | Authorization granted |
 | `REVOKE` | Cross-tenant, actors | Authorization revoked |
 | `EVALUATE` | Policies | Policy evaluated (with outcome) |
-| `ENRICH` | Fields | Field enriched by policy, layer, or Mode 4 provider |
+| `ENRICH` | Fields | Field enriched by policy, layer, or external policy evaluation |
 | `LOCK` | Fields | Field locked (override: immutable set) |
 | `HOLD_PLACE` | Resources | Resource hold placed with provider |
 | `HOLD_CONFIRM` | Resources | Resource hold confirmed |
@@ -220,7 +220,7 @@ The `action` field uses a closed vocabulary. Free-text actions are invalid and r
 | `PROMOTE` | Entities | Ingested entity promoted to full lifecycle |
 | `EXPIRE` | Entities | Lifecycle time constraint expiry action fired |
 | `REHYDRATE` | Entities | Rehydration requested |
-| `QUERY` | Mode 4 | Black box query sent and result received |
+| `QUERY` | external evaluation | Black box query sent and result received |
 | `DISCOVER` | Entities | Discovery cycle completed |
 | `LOGIN` | Actors | Actor authentication event |
 | `LOGOUT` | Actors | Actor session ended |
@@ -396,28 +396,156 @@ Audit Forward Service reads pending_forward Commit Log entries
 
 ---
 
-## 8. Tamper-Evidence — Hash Chain
+## 8. Tamper-Evidence and Payload Integrity — Merkle Tree
 
-Each audit record carries:
-- `record_hash` — SHA-256 of the record's content
-- `previous_record_hash` — hash of the immediately preceding audit record for this entity
-- `chain_sequence` — monotonically increasing integer per entity
+DCM unifies audit trail integrity and payload chain-of-custody verification into a single mechanism: a **Merkle tree** following the RFC 9162 (Certificate Transparency v2.0) pattern. Each audit record is a leaf in the tree. The tree provides O(log n) inclusion proofs (prove a record exists) and O(log n) consistency proofs (prove the log is append-only). Signed Tree Heads provide the root of trust.
 
-Together these form a **per-entity hash chain**. To verify integrity:
+This model satisfies NIST SP 800-53 AU-9(3) (cryptographic protection of audit information), AU-10 (non-repudiation with AU-10(2) producer identity binding, AU-10(3) chain of custody, AU-10(5) digital signatures), SI-7 (information integrity), and NIST SP 800-171 3.3 (audit and accountability for CUI/CMMC).
 
+### 8.1 Audit Granularity Levels
+
+Administrators configure how granular the audit trail is. Higher granularity produces more leaves per request, enabling more precise forensics at the cost of more storage and processing.
+
+| Level | Leaves per request | What is tracked | Use case |
+|-------|-------------------|----------------|----------|
+| **stage** | ~5–6 | One leaf per pipeline stage (intent, assembly, policy, placement, dispatch, callback). Each leaf includes before/after payload hash for the entire stage. | Homelab, dev, demo — proves the pipeline executed correctly. |
+| **mutation** | ~15–30 | One leaf per individual change — each layer merge, each policy evaluation, each constraint resolution, each placement decision. Before/after payload hash per mutation. | Production — full chain of custody. Shows exactly which policy or layer caused each change. |
+| **field** | ~15–30 (same leaf count, richer content) | Mutation-level plus per-field old/new value hashes on every mutation. For overrides, records both old and new value hashes. | FedRAMP, sovereign, FSI — maximum auditability. An auditor can verify not just that a field changed, but what it changed from and to. |
+
+**Profile defaults:**
+
+| Profile | Default granularity | Override permitted? |
+|---------|-------------------|-------------------|
+| `minimal` | stage | Yes — can increase |
+| `dev` | stage | Yes |
+| `standard` | mutation | Yes — can increase to field |
+| `prod` | mutation | Yes |
+| `fsi` | field | No — field is minimum for FSI |
+| `sovereign` | field | No — field is minimum for sovereign |
+
+**Configuration:**
+```yaml
+audit:
+  granularity: stage | mutation | field      # default per profile
+  signed_tree_head_interval: 100             # compute STH every N leaves (default)
+  signed_tree_head_max_delay: PT60S          # or every T seconds, whichever comes first
+  verification_mode: synchronous | asynchronous | disabled
+  tree_node_storage: materialized | computed # store intermediate nodes or recompute
 ```
-For each entity:
-  Load all audit records ordered by chain_sequence
-  For each record:
-    Verify record_hash == SHA-256(record content)
-    Verify previous_record_hash == record_hash of sequence N-1
-  If any verification fails:
-    → Chain broken — tampering detected
-    → Alert dispatched to security and platform admin
-    → Affected records flagged in audit dashboard
+
+`verification_mode` controls whether the next pipeline stage verifies the previous stage's signature before processing:
+- `synchronous` — next stage blocks until verification passes (required for fsi/sovereign)
+- `asynchronous` — verification runs in background; pipeline proceeds optimistically
+- `disabled` — no inter-stage verification (homelab only)
+
+### 8.2 Leaf Structure
+
+Every audit record (regardless of granularity level) is a Merkle tree leaf with this structure:
+
+```yaml
+audit_leaf:
+  # Identity
+  leaf_uuid: <uuid>
+  leaf_index: <int>                         # position in global Merkle tree
+  request_uuid: <uuid>                      # which request this belongs to
+  entity_uuid: <uuid | null>                # primary entity (null for system events)
+  tenant_uuid: <uuid>
+
+  # What happened
+  stage: intent_submitted | layer_applied | policy_evaluated | constraint_resolved |
+         placement_scored | dispatched | provider_callback | ...
+  source: "<handle>"                        # which layer, policy, or service
+  source_type: actor | layer_merge | policy_gatekeeper | policy_transformation |
+               policy_validation | constraint_resolution | placement | dispatch |
+               provider_callback | system
+  action: <closed vocabulary>               # from Section 4
+  decision: <allow | deny | applied | resolved | ...>
+
+  # Chain of custody — payload integrity
+  input_payload_hash: <sha-256>             # hash of payload BEFORE this mutation
+  output_payload_hash: <sha-256>            # hash of payload AFTER this mutation
+  context_hash: <sha-256 | null>            # evaluation context hash (policy stages only)
+
+  # Field-level detail (mutation and field granularity only)
+  fields_changed: ["field.path.one", "field.path.two"]    # mutation+ only
+  field_mutations:                                         # field granularity only
+    - field: "monitoring.agent_config"
+      action: injected | overridden | removed
+      old_value_hash: <sha-256 | null>      # null for injected (no previous value)
+      new_value_hash: <sha-256>
+
+  # Who
+  signer_uuid: <uuid>                       # service or actor identity
+  signer_type: service | actor | provider
+  timestamp: <ISO 8601>
+
+  # Cryptographic binding
+  signature: <Ed25519 or ECDSA-P256>        # signature over all above fields
+  previous_leaf_hash: <sha-256>             # hash of the previous leaf for this request
 ```
 
-Inserting, modifying, or deleting any historical record breaks the chain at that point and all subsequent records for that entity. The breach is detectable at the next verification run.
+At **stage** granularity, `fields_changed` and `field_mutations` are omitted. The leaf records only the before/after payload hash for the entire stage.
+
+At **mutation** granularity, `fields_changed` is populated (which fields changed) but `field_mutations` (old/new value hashes per field) is omitted.
+
+At **field** granularity, both are populated. Full forensic detail.
+
+### 8.3 Signed Tree Heads
+
+The Audit Service periodically computes a new Merkle root and signs it:
+
+```yaml
+signed_tree_head:
+  tree_size: <int>                          # number of leaves in the tree
+  timestamp: <ISO 8601>
+  sha256_root_hash: <sha-256>               # Merkle root
+  signature: <Ed25519>                      # signed by DCM's audit signing key
+```
+
+Signed Tree Heads are computed every N leaves or every T seconds (configurable). They are the root of trust for all verification. External auditors verify records against the signed tree head — they don't need access to the database, only the tree head and the inclusion proof.
+
+### 8.4 Verification
+
+**Inclusion proof** — prove a specific record exists in the tree:
+```
+POST /api/v1/audit/tree/inclusion-proof
+Input: leaf_hash, tree_size
+Output: proof path (O(log n) hashes from leaf to root)
+```
+
+**Consistency proof** — prove the current tree is a strict superset of a previous tree:
+```
+POST /api/v1/audit/tree/consistency-proof
+Input: old_tree_size, new_tree_size
+Output: proof path (O(log n) hashes)
+```
+
+**Request chain verification** — prove a specific request's full pipeline integrity:
+```
+POST /api/v1/audit/tree/verify-request/{request_uuid}
+Output: all leaves for the request + inclusion proofs + payload hash chain verification
+  - Verifies each leaf is in the tree (inclusion proofs)
+  - Verifies output_payload_hash[N] == input_payload_hash[N+1] (chain of custody)
+  - Verifies all signatures against known signing keys
+  - Verifies timestamps are monotonically increasing
+  - Returns: VERIFIED | CHAIN_BREAK (with break location) | SIGNATURE_INVALID
+```
+
+### 8.5 Applicable Standards
+
+| Standard | Control | How DCM satisfies it |
+|----------|---------|---------------------|
+| RFC 9162 | Certificate Transparency v2.0 — Merkle tree, inclusion/consistency proofs, signed tree heads | Structural model for DCM's audit tree |
+| NIST 800-53 AU-9(3) | Cryptographic protection of audit information | Merkle tree + signed tree heads |
+| NIST 800-53 AU-10(2) | Validate binding of information producer identity | Each leaf signed by producing service |
+| NIST 800-53 AU-10(3) | Chain of custody | input/output payload hash linking across leaves |
+| NIST 800-53 AU-10(5) | Digital signatures on audit records | Ed25519/ECDSA-P256 per leaf + tree head |
+| NIST 800-53 SI-7(1) | Integrity checks | Payload hash verification at each stage transition |
+| NIST 800-171 3.3 | Audit and accountability for CUI | Full audit trail with integrity protection |
+| FIPS 186-5 | Digital Signature Standard | Ed25519 or ECDSA-P256 for signatures; ML-DSA ready for post-quantum |
+| FIPS 180-4 | SHA-2 | SHA-256 for all hashing |
+| FedRAMP High | AU-10 non-repudiation required | Merkle tree + signing satisfies all AU-10 enhancements |
+| SOC 2 Type II CC7.2 | Detection of unauthorized changes | Consistency proofs detect any log modification |
 
 ---
 
@@ -430,14 +558,16 @@ Inserting, modifying, or deleting any historical record breaks the chain at that
 | `AUD-003` | Audit records must survive at least as long as any referenced entity is in a non-retired/non-decommissioned state (retention_status: live). |
 | `AUD-004` | Post-lifecycle retention is governed by policy. Default is `retain_for: P7Y` after all referenced entities reach terminal state. |
 | `AUD-005` | The actor field must identify both the immediate actor and the authorized_by human actor chain to the extent traceable. |
-| `AUD-006` | Audit records must carry a `record_hash` and `previous_record_hash` forming a tamper-evident hash chain per entity. |
+| `AUD-006` | Audit records form a Merkle tree (RFC 9162 pattern). Each leaf carries a signature from the producing service and a payload hash linking it to adjacent leaves in the request chain. |
 | `AUD-007` | The action field must use the closed vocabulary — free-text action fields are invalid and must be rejected at write time. |
-| `AUD-008` | Audit Store implementations must support queries by: entity_uuid, actor_uuid, action, timestamp range, tenant_uuid, request_uuid, and retention_status. |
+| `AUD-008` | Audit Store implementations must support queries by: entity_uuid, actor_uuid, action, timestamp range, tenant_uuid, request_uuid, leaf_index, and retention_status. |
 | `AUD-009` | The Audit Forward Service must deliver all Commit Log entries to the Audit Store with exponential backoff retry. Commit Log entries may only be cleared after both: (a) Audit Store confirms receipt AND (b) entry has aged beyond the Commit Log retention window. |
-| `AUD-010` | Hash chain verification must be available as a first-class DCM operation. Chain breaks must trigger immediate security alerts. |
+| `AUD-010` | Merkle tree verification (inclusion proofs, consistency proofs, request chain verification) must be available as first-class DCM operations. Verification failures trigger immediate security alerts. |
 | `AUD-011` | On DCM restart, the Audit Forward Service must replay all `status: pending_forward` Commit Log entries before accepting new operations. |
-| `AUD-012` | The Commit Log must use consensus protocol (Raft or equivalent) with quorum writes. A write is confirmed durable only when a quorum of replicas acknowledges it. |
+| `AUD-012` | Signed Tree Heads must be computed at the interval configured by the deployment profile. STH signing key must be stored in the secrets table (internal) or Vault (external). |
 | `AUD-013` | The Stage 1 timestamp in the Commit Log is the authoritative audit timestamp. Stage 2 enrichment timestamps record when the full audit record became queryable — not when the change occurred. |
+| `AUD-014` | Audit granularity level is configured per deployment profile. `fsi` and `sovereign` profiles require `field` granularity — this cannot be downgraded. |
+| `AUD-015` | Inter-stage verification mode is configured per deployment profile. `fsi` and `sovereign` profiles require `synchronous` verification — the pipeline halts if any signature verification fails. |
 
 ---
 
@@ -458,7 +588,7 @@ Inserting, modifying, or deleting any historical record breaks the chain at that
 - **Field-Level Provenance** — data lineage embedded in every payload; separate from audit records
 - **Storage Providers** (doc 11) — Audit Store contract: append-only, WAL delivery, hash chain, retention tracking
 - **Universal Groups** (doc 15) — all group changes produce audit records per this model
-- **Policy Organization** (doc 14) — policy activation, shadow evaluation, and Mode 4 queries all produce audit records
+- **Policy Organization** (doc 14) — policy activation, shadow evaluation, and external evaluation queries all produce audit records
 
 
 ## 10. Universal Audit Gap Resolutions

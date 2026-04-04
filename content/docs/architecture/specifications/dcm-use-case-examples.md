@@ -1126,10 +1126,10 @@ auth_provider_registration:
 **Registration:**
 
 ```yaml
-storage_provider_registration:
+(prescribed infrastructure)_registration:
   uuid: pvd-cph-001
   name: ceph-prod
-  display_name: Ceph — Realized State Snapshot Store
+  display_name: Ceph — Realized State realized data domain
   store_type: write_once_snapshot
   version: "1.0.0"
   endpoint: https://ceph-rgw.corp.example:7480
@@ -1169,7 +1169,7 @@ storage_write_request:
 **Registration:**
 
 ```yaml
-message_bus_provider_registration:
+(optional infrastructure)_registration:
   uuid: pvd-rmq-001
   name: rabbitmq-prod
   display_name: RabbitMQ — DCM Event Bus
@@ -1213,7 +1213,7 @@ publish:
 subscribe:
   queue: dcm.notifications.critical
   binding: "#.critical"            # all critical urgency events
-  handler: notification_provider    # Notification Provider consumes and routes
+  handler: service_provider    # Notification Provider consumes and routes
 
 # 3. ITSM Provider subscribes to provider events
 subscribe:
@@ -1229,7 +1229,7 @@ subscribe:
 **Registration:**
 
 ```yaml
-credential_provider_registration:
+service_provider_registration:
   uuid: pvd-vlt-001
   name: vault-prod
   display_name: HashiCorp Vault — Credential Provider
@@ -1700,7 +1700,7 @@ PATCH /api/v1/admin/policies/compliance/pci/card-data-network-isolation
 
 ```yaml
 # OPA sidecar (Policy Provider) registered:
-policy_provider_registration:
+external_policy_evaluation_registration:
   uuid: pvd-opa-001
   name: opa-compliance-sidecar
   mode: sidecar                    # co-deployed with DCM control plane
@@ -1716,7 +1716,7 @@ policy_provider_registration:
 # 1. OPA sidecar polls git repo every 5 minutes
 # 2. New bundle detected (policy updated by compliance team via GitOps PR)
 # 3. OPA loads new bundle — hot reload, no downtime
-# 4. DCM notified: policy_provider.bundle_updated event
+# 4. DCM notified: external_policy_evaluation.bundle_updated event
 
 # Policy evaluation call (from Request Orchestrator to OPA sidecar):
 POST /v1/data/dcm/policies/evaluate

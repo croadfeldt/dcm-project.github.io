@@ -26,11 +26,13 @@ Spec references: doc A (Provider Contract), dcm-operator-interface-spec.md, dcm-
 
 | Level | Required Endpoints | Unlocks |
 |-------|-------------------|---------|
-| **Level 1** | POST /api/v1/resources, GET /health, callback on completion | Basic provisioning and decommission |
+| **Level 1** | POST /api/v1/resources, GET /health, GET /capabilities, callback on completion | Basic provisioning, decommission, capability introspection |
 | **Level 2** | + GET /discover, GET /capacity, PATCH /api/v1/resources/{id} | Discovery, drift detection, updates |
 | **Level 3** | + PUT /api/v1/resources/{id}:bulk-import | Brownfield ingestion |
 
 Start with Level 1, add Level 2 for drift detection capability.
+
+**`GET /capabilities`** returns the provider's available options — networks, storage classes, images, regions, or any domain-specific resources the consumer can reference in requests. The Policy Engine's Transformation policies query this endpoint during assembly to validate and enrich consumer input. Without it, policies would need to hardcode provider-specific values.
 
 ---
 

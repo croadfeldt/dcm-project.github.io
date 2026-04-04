@@ -92,22 +92,22 @@ This is the complete DCM operational model. Everything else is a typed specializ
 
 **How Data flows — the four lifecycle stages:**
 
-Every Resource Entity flows through four stages. These are not four separate things — they are the same entity at four different lifecycle stages, stored in specialized stores optimized for each stage's access pattern:
+Every Resource Entity flows through four stages. These are not four separate things — they are the same entity at four different lifecycle stages, stored as four data domains in DCM's PostgreSQL database, each with distinct immutability and access patterns:
 
 ```
 Consumer Intent
     │ raw consumer declaration
     ▼
-Intent State ──────────────────────────────────── GitOps Store
+Intent State ──────────────────────────────────── intent_records (append-only)
     │ layer assembly + policy evaluation
     ▼
-Requested State ────────────────────────────────── Write-once Store
+Requested State ────────────────────────────────── requested_records (append-only)
     │ provider execution
     ▼
-Realized State ─────────────────────────────────── Snapshot Store
+Realized State ─────────────────────────────────── realized_entities (versioned snapshots)
     │ independent observation
     ▼
-Discovered State ───────────────────────────────── Ephemeral Stream
+Discovered State ───────────────────────────────── discovered_records (ephemeral)
 ```
 
 **How Data is composed — the layering model:**

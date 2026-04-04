@@ -212,15 +212,15 @@ Tenant isolation in DCM is enforced at the data model level (every entity carrie
 
 | Store Type | Isolation Strategy | Implementation Notes |
 |-----------|-------------------|---------------------|
-| **GitOps Store** (Intent/Requested State) | Directory namespace per tenant | `/tenants/{tenant_uuid}/intents/`, `/tenants/{tenant_uuid}/requests/` — Git ACLs enforce read/write scope |
-| **Event Stream Store** (Audit) | Separate stream per tenant | `dcm.audit.{tenant_uuid}` stream; Kafka topic ACLs restrict producer/consumer access |
-| **Snapshot Store** (Realized State) | Row-level filter + column-level encryption | `tenant_uuid` column indexed; all queries mandatory-include `WHERE tenant_uuid = ?`; tenant-scoped encryption key |
+| **DCM database** (Intent/Requested State) | Directory namespace per tenant | `/tenants/{tenant_uuid}/intents/`, `/tenants/{tenant_uuid}/requests/` — Git ACLs enforce read/write scope |
+| **pipeline_events table** (Audit) | Separate stream per tenant | `dcm.audit.{tenant_uuid}` stream; Kafka topic ACLs restrict producer/consumer access |
+| **realized data domain** (Realized State) | Row-level filter + column-level encryption | `tenant_uuid` column indexed; all queries mandatory-include `WHERE tenant_uuid = ?`; tenant-scoped encryption key |
 | **Search Index** | Index namespace per tenant | Separate index prefix `tenant_{uuid}_*`; query routing enforces tenant scope |
 | **Rate Limit Cache** | Key-namespaced per actor (actor carries tenant context) | `rl:{tenant_uuid}:{actor_uuid}` key structure |
 
-### 4.2 Snapshot Store — Row-Level Security Implementation
+### 4.2 realized data domain — Row-Level Security Implementation
 
-The Snapshot Store (Realized State) uses row-level security as the primary isolation mechanism:
+The realized data domain (Realized State) uses row-level security as the primary isolation mechanism:
 
 ```sql
 -- PostgreSQL row-level security policy
@@ -246,12 +246,12 @@ Tenant provisioned:
   │   Key stored in: Credential Provider (e.g., Vault)
   │   Key reference stored in: Tenant record as tenant_encryption_key_ref
   │
-  ▼ On write to Snapshot Store:
+  ▼ On write to realized data domain:
   │   API Gateway fetches tenant encryption key
   │   Payload encrypted with tenant key before storage
   │   Storage Provider stores ciphertext only
   │
-  ▼ On read from Snapshot Store:
+  ▼ On read from realized data domain:
   │   API Gateway fetches tenant encryption key
   │   Decrypts payload in memory
   │   Plaintext never written to Storage Provider logs
@@ -285,10 +285,10 @@ DCM's multi-region deployment model is specified in [Deployment Redundancy](17-d
 
 | Store Type | Replication Model | Sovereignty Constraint |
 |-----------|------------------|----------------------|
-| **GitOps Store** (Intent State) | Git push/pull — upstream-downstream replication | Intent records tagged with `sovereignty_zone`; replicated only to stores within the declared zone |
-| **Event Stream Store** (Audit) | Stream mirroring with lag monitoring | Audit records replicated to all authorized regions; cross-sovereignty replication requires explicit consent |
-| **Snapshot Store** (Realized State) | Synchronous within-zone; async cross-zone with consent | `sovereignty_zone` on entity governs which regions may hold a copy |
-| **Search Index** | Async replication; eventual consistency acceptable | Same sovereignty rules as Snapshot Store |
+| **DCM database** (Intent State) | Git push/pull — upstream-downstream replication | Intent records tagged with `sovereignty_zone`; replicated only to stores within the declared zone |
+| **pipeline_events table** (Audit) | Stream mirroring with lag monitoring | Audit records replicated to all authorized regions; cross-sovereignty replication requires explicit consent |
+| **realized data domain** (Realized State) | Synchronous within-zone; async cross-zone with consent | `sovereignty_zone` on entity governs which regions may hold a copy |
+| **Search Index** | Async replication; eventual consistency acceptable | Same sovereignty rules as realized data domain |
 
 ### 5.2 Sovereignty-Aware Replication
 
@@ -527,7 +527,7 @@ All Service Provider OpenAPI specifications submitted at registration must be si
 **Operator Container Image Provenance:**
 The DCM reference implementation containers are signed using Sigstore (Cosign). Deployment manifests declare the expected image digest. Any container running a different digest triggers drift detection on DCM's own deployment.
 
-**GitOps Store Secrets Scanning:**
+**DCM database Secrets Scanning:**
 All content committed to DCM's GitOps stores passes through a secrets scanner before being accepted. The scanner checks for:
 - High-entropy strings matching known secret patterns (API keys, tokens, private keys)
 - Known credential formats (AWS access keys, GitHub PATs, JWT secrets)

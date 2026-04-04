@@ -266,8 +266,8 @@ Kessel Inventory's role is purely as the data source for the "what currently exi
 DCM's Storage Provider abstraction (doc 11) is the natural integration point. The Discovered Store would be implemented as a `storage_sub_type: snapshot_store` Storage Provider backed by Kessel Inventory:
 
 ```yaml
-kessel_inventory_storage_provider:
-  provider_type: storage_provider
+kessel_inventory_(prescribed infrastructure):
+  provider_type: (prescribed infrastructure)
   storage_sub_type: snapshot_store
   backend: kessel_inventory
   endpoint: https://kessel-inventory.internal:9001

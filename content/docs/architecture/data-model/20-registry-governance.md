@@ -423,7 +423,7 @@ registry_provider_registration:
   offline_mode: false                # true: no external connectivity
   signed_bundle_import: false        # true: updates via signed bundles only
   bundle_signing_key_ref:
-    credential_provider_uuid: <uuid>
+    service_provider_uuid: <uuid>
     secret_path: "dcm/registry/bundle-verification-key"
 
   # Sovereignty filtering

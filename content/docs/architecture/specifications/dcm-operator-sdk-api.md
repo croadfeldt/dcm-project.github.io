@@ -2,7 +2,7 @@
 
 **Document Status:** ✅ Complete
 **Document Type:** SDK Reference (Go)
-**Related Documents:** [Operator Interface Specification](dcm-operator-interface-spec.md) | [Kubernetes Compatibility](11-kubernetes-compatibility.md) | [Provider Callback Auth](../data-model/43-provider-callback-auth.md) | [Registration Specification](dcm-registration-spec.md)
+**Related Documents:** [Operator Interface Specification](dcm-operator-interface-spec.md) | [Kubernetes Compatibility](kubernetes-compatibility.md) | [Provider Callback Auth](../data-model/43-provider-callback-auth.md) | [Registration Specification](dcm-registration-spec.md)
 
 > **AEP Alignment:** DCM interaction uses colon-syntax custom methods (`:approve`, `:suspend`).
 > `operation_uuid == request_uuid` — Operations polling uses `GET /api/v1/operations/{uuid}`.
@@ -37,7 +37,7 @@
 **Document Type:** Technical Design  
 **Language:** Go  
 **Repository:** https://github.com/dcm-project/operator-sdk  
-**Related Documents:** [Foundational Abstractions](../data-model/00-foundations.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md) | [Kubernetes Compatibility](11-kubernetes-compatibility.md)
+**Related Documents:** [Foundational Abstractions](../data-model/00-foundations.md) | [DCM Operator Interface Specification](dcm-operator-interface-spec.md) | [Kubernetes Compatibility](kubernetes-compatibility.md)
 
 ---
 

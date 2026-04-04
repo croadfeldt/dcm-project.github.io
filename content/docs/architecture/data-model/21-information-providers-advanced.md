@@ -428,7 +428,7 @@ information_provider_registration:
     write_back_authentication:
       mode: api_key
       key_ref:
-        credential_provider_uuid: <uuid>
+        service_provider_uuid: <uuid>
         secret_path: "dcm/providers/info/cmdb/write-key"
 ```
 

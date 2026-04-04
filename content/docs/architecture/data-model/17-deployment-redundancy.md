@@ -119,7 +119,7 @@ commit_log:
 
 The Commit Log uses consensus protocol (Raft/equivalent). A write is confirmed when the quorum acknowledges — ensuring durability even if a minority of replicas fail simultaneously.
 
-#### GitOps Store (Intent, Requested, Layers, Policies)
+#### DCM database (Intent, Requested, Layers, Policies)
 
 ```yaml
 gitops_store:
@@ -133,7 +133,7 @@ gitops_store:
     retention: 30d
 ```
 
-#### Event Stream Store (Realized, Discovered, Audit Events)
+#### pipeline_events table (Realized, Discovered, Audit Events)
 
 ```yaml
 event_stream:

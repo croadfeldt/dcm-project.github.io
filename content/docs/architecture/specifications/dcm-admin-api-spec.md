@@ -528,7 +528,7 @@ Response 200:
     "request_orchestrator": { "status": "healthy" },
     "policy_engine":        { "status": "healthy" },
     "placement_engine":     { "status": "healthy" },
-    "credential_provider":  { "status": "degraded", "reason": "rotation_pending" }
+    "service_provider":  { "status": "degraded", "reason": "rotation_pending" }
   },
   "stores": {
     "intent_store":    { "status": "healthy", "latency_p99_ms": 12 },

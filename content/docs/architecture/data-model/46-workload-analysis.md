@@ -2,7 +2,7 @@
 
 **Document Status:** 📋 Draft — Specification in Progress
 **Document Type:** Capability Specification
-**Related Documents:** [Ingestion Model](13-ingestion-model.md) | [Information Providers](10-information-providers.md) | [Resource Type Hierarchy](05-resource-type-hierarchy.md) | [Discovery and Drift](25-control-plane-components.md) | [Kubernetes Compatibility](../specifications/11-kubernetes-compatibility.md)
+**Related Documents:** [Ingestion Model](13-ingestion-model.md) | [Information Providers](10-information-providers.md) | [Resource Type Hierarchy](05-resource-type-hierarchy.md) | [Discovery and Drift](25-control-plane-components.md) | [Kubernetes Compatibility](../specifications/kubernetes-compatibility.md)
 
 > **AEP Alignment:** API endpoints follow [AEP](https://aep.dev) conventions.
 > Workload analysis results are delivered as Information Provider payloads

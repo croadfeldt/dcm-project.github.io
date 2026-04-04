@@ -174,7 +174,7 @@ Registration approved (provider status → ACTIVE):
   │   Response includes: credential_ref (UUID for retrieval)
   │
   ▼ Provider retrieves credential value via Credential Provider endpoint:
-  │   GET {credential_provider_endpoint}/credentials/{credential_ref}/value
+  │   GET {service_provider_endpoint}/credentials/{credential_ref}/value
   │   (Requires the registration token used at initial registration — one-time bootstrap)
   │
   ▼ Provider stores credential securely and uses it for all callback API calls

@@ -499,7 +499,7 @@ Policy Engine evaluation run:
   13. Route request: auto_approve | queue_for_review | queue_dual | queue_authorized
 ```
 
-Step 2, 3, and 4 are unchanged from the existing model. Steps 5–13 are additive.
+Steps 2–4 handle standard policy evaluation. Steps 5–13 extend the model with scoring and approval routing.
 
 ---
 

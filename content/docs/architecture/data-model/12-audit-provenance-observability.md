@@ -351,7 +351,7 @@ Persona-based access control is enforced at the API Gateway level for all endpoi
 
 | # | Question | Impact | Status |
 |---|----------|--------|--------|
-| 1 | Should the Audit Store be a specialized Storage Provider or can a general Event Stream Store satisfy the audit contract? | Architecture | ✅ Resolved — specialized Storage Provider sub-type; append-only; hash chain integrity; reference-based retention; compliance queries; see doc 11 (STO-004) |
+| 1 | Should the Audit Store be a specialized Storage Provider or can a general pipeline_events table satisfy the audit contract? | Architecture | ✅ Resolved — specialized Storage Provider sub-type; append-only; hash chain integrity; reference-based retention; compliance queries; see doc 11 (STO-004) |
 | 2 | How are audit records replicated across sites in air-gapped or geographically distributed deployments? | Sovereignty | ✅ Resolved — live sync for Regional DCMs; signed bundle for Sovereign DCMs; sovereignty check required; hash chain preserved across transport (AUD-018) |
 | 3 | Should DCM provide a default observability dashboard or only the telemetry? | Deployment | ✅ Resolved — default Grafana dashboard for minimal/dev/standard; enterprise integration recommended for prod; required for fsi; local-only for sovereign (OBS-002) |
 | 4 | How does the Audit component handle provenance events from a Storage Provider that has been deregistered? | Operational | ✅ Resolved — two-stage model handles this; Commit Log independent of Storage Providers; gap record inserted on Audit Store recovery; chain makes gap explicit (AUD-019) |

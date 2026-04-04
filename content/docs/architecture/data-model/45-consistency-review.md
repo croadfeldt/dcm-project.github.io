@@ -130,12 +130,12 @@ Multiple naming variants found across documents. The canonical names are:
 
 | Store | Canonical Name | Also Used (acceptable) | Do Not Use |
 |-------|---------------|----------------------|------------|
-| Intent State storage | **Intent Store** | GitOps Store (when emphasizing the implementation) | Intent State Store |
+| Intent State storage | **Intent Store** | DCM database (when emphasizing the implementation) | Intent State Store |
 | Requested State storage | **Requested Store** | — | Requested State Store |
 | Realized State storage | **Realized Store** | Realized State Store | Realization Store |
 | Discovered State storage | **Discovered Store** | — | Discovered State Store |
 
-No bulk renaming was performed — both "Intent Store" and "GitOps Store" are used accurately in different contexts (the former emphasizes the state model, the latter the implementation). The variation is acceptable context-dependent usage, not an error.
+No bulk renaming was performed — both "Intent Store" and "DCM database" are used accurately in different contexts (the former emphasizes the state model, the latter the implementation). The variation is acceptable context-dependent usage, not an error.
 
 ---
 
@@ -244,7 +244,7 @@ These are not errors — they are deliberate context-dependent usage:
 | `Service Provider` / `service_provider` | Title case in prose, snake_case in code | Convention |
 | `Auth Provider` / `auth_provider` | Same | Convention |
 | `Policy Engine` / `policy_engine` | Same | Convention |
-| Intent Store / GitOps Store | Both describe the same store | Different emphasis (state model vs implementation) |
+| Intent Store / DCM database | Both describe the same store | Different emphasis (state model vs implementation) |
 | `entity.created` / `resource.provisioned` | Different semantic levels | Entity creation vs provisioning completion are distinct events |
 
 ### Implementation Decisions Still Outstanding
